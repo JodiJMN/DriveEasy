@@ -1,0 +1,121 @@
+{% extends "admin/base.html" %}
+{% block title %}Dashboard — Admin DriveEasy{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<!-- Stats Cards -->
+<div class="stat-grid">
+  <div class="stat-card stat-blue">
+    <div class="sc-icon">🚗</div>
+    <div class="sc-body">
+      <div class="sc-val">{{ stats.total_cars }}</div>
+      <div class="sc-label">Total Armada</div>
+    </div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="sc-icon">✅</div>
+    <div class="sc-body">
+      <div class="sc-val">{{ stats.available_cars }}</div>
+      <div class="sc-label">Tersedia Sekarang</div>
+    </div>
+  </div>
+  <div class="stat-card stat-yellow">
+    <div class="sc-icon">⏳</div>
+    <div class="sc-body">
+      <div class="sc-val">{{ stats.pending_bookings }}</div>
+      <div class="sc-label">Booking Pending</div>
+    </div>
+  </div>
+  <div class="stat-card stat-purple">
+    <div class="sc-icon">💰</div>
+    <div class="sc-body">
+      <div class="sc-val">{{ stats.revenue_this_month | currency }}</div>
+      <div class="sc-label">Revenue Bulan Ini</div>
+    </div>
+  </div>
+  <div class="stat-card" style="background:linear-gradient(135deg,#fef9c3,#fde68a);">
+    <div class="sc-icon">⭐</div>
+    <div class="sc-body">
+      <div class="sc-val">
+        {% if review_stats and review_stats.avg_rating %}
+          {{ review_stats.avg_rating }}
+        {% else %}—{% endif %}
+      </div>
+      <div class="sc-label">Rata-rata Rating
+        <small style="display:block;font-size:.75rem;color:#92400e;">
+          {{ review_stats.total_reviews if review_stats else 0 }} ulasan
+        </small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="quick-actions">
+  <a href="{{ url_for('admin_car_add') }}" class="qa-btn qa-blue">
+    <span>➕</span> Tambah Mobil Baru
+  </a>
+  <a href="{{ url_for('admin_discounts') }}" class="qa-btn qa-yellow">
+    <span>🏷️</span> Kelola Diskon
+  </a>
+  <a href="{{ url_for('admin_bookings', status='pending') }}" class="qa-btn qa-orange">
+    <span>📋</span> Booking Pending ({{ stats.pending_bookings }})
+  </a>
+  <a href="{{ url_for('admin_bookings') }}" class="qa-btn qa-green">
+    <span>📊</span> Semua Pemesanan
+  </a>
+  <a href="{{ url_for('admin_reviews') }}" class="qa-btn" style="background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;">
+    <span>⭐</span> Kelola Ulasan ({{ review_stats.total_reviews if review_stats else 0 }})
+  </a>
+</div>
+
+<!-- Recent Bookings -->
+<div class="admin-section">
+  <div class="asec-header">
+    <h2>Pemesanan Terbaru</h2>
+    <a href="{{ url_for('admin_bookings') }}" class="btn btn-outline btn-sm">Lihat Semua</a>
+  </div>
+
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>#ID</th>
+          <th>Penyewa</th>
+          <th>Mobil</th>
+          <th>Tanggal Sewa</th>
+          <th>Total</th>
+          <th>Status</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in recent_bookings %}
+        <tr>
+          <td><strong>#{{ b.id }}</strong></td>
+          <td>
+            <div>{{ b.customer_name }}</div>
+            <small>{{ b.phone_number }}</small>
+          </td>
+          <td>{{ b.brand }} {{ b.car_name }}</td>
+          <td>
+            <small>{{ b.start_date }} → {{ b.end_date }}</small>
+          </td>
+          <td><strong>{{ b.total_price | currency }}</strong></td>
+          <td>
+            <span class="status-badge status-{{ b.status }}">{{ b.status }}</span>
+          </td>
+          <td>
+            <a href="{{ url_for('admin_bookings') }}" class="btn btn-outline btn-xs">Detail</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="td-empty">Belum ada pemesanan</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

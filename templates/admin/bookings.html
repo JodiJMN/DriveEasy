@@ -1,0 +1,132 @@
+{% extends "admin/base.html" %}
+{% block title %}Pemesanan — Admin DriveEasy{% endblock %}
+{% block page_title %}Kelola Pemesanan{% endblock %}
+
+{% block content %}
+
+<!-- Status filter tabs -->
+<div class="tab-filter" style="margin-bottom:20px">
+  <a href="{{ url_for('admin_bookings') }}"
+     class="tf-btn {% if not status_filter %}active{% endif %}">Semua</a>
+  {% for s, label in [('pending','Pending'),('confirmed','Dikonfirmasi'),
+                       ('completed','Selesai'),('cancelled','Dibatalkan')] %}
+  <a href="{{ url_for('admin_bookings', status=s) }}"
+     class="tf-btn {% if status_filter == s %}active{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="table-wrap">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>#ID</th>
+        <th>Penyewa</th>
+        <th>Mobil</th>
+        <th>Tanggal Sewa</th>
+        <th>Pembayaran</th>
+        <th>Status</th>
+        <th>KTP</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for b in bookings %}
+      <tr>
+        <td><strong>#{{ b.id }}</strong><br><small>{{ b.created_at.strftime('%d/%m/%y') if b.created_at else '-' }}</small></td>
+        <td>
+          <strong>{{ b.customer_name }}</strong><br>
+          <a href="https://wa.me/{{ b.phone_number }}" target="_blank" style="color:#25d366;font-size:13px">
+            📱 {{ b.phone_number }}
+          </a>
+        </td>
+        <td>{{ b.brand }} {{ b.car_name }}</td>
+        <td>
+          <small>{{ b.start_date }}</small><br>
+          <small>→ {{ b.end_date }}</small><br>
+          <small style="color:#94a3b8">{{ b.total_days }} hari</small>
+        </td>
+        <td>
+          <strong>{{ b.total_price | currency }}</strong>
+          {% if b.discount_amount and b.discount_amount > 0 %}
+          <br><small style="color:#22c55e">Hemat {{ b.discount_amount | currency }}</small>
+          {% endif %}
+          {% if b.discount_name %}
+          <br><small style="color:#94a3b8">{{ b.discount_name }}</small>
+          {% endif %}
+        </td>
+        <td><span class="status-badge status-{{ b.status }}">{{ b.status }}</span></td>
+        <td>
+          {% if b.ktp_filename %}
+          <a href="{{ url_for('static', filename='uploads/ktp/' + b.ktp_filename) }}"
+             target="_blank" class="btn btn-outline btn-xs">🪪 Lihat</a>
+          {% else %}
+          <span style="color:#ef4444">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <button class="btn btn-primary btn-xs"
+                  onclick="openStatusModal({{ b.id }}, '{{ b.status }}', '{{ b.admin_notes or '' }}')">
+            ⚙️ Update
+          </button>
+          <a href="https://wa.me/{{ b.phone_number }}?text={{ ('Halo ' + b.customer_name + ', booking Anda untuk ' + b.car_name + ' telah dikonfirmasi. Silakan lakukan pembayaran.') | urlencode }}"
+             target="_blank" class="btn btn-wa btn-xs">💬</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="td-empty">Tidak ada pemesanan.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal-overlay" id="statusModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>⚙️ Update Status Booking</h3>
+      <button onclick="closeModal('statusModal')">✕</button>
+    </div>
+    <form method="POST" id="statusForm" class="admin-form">
+      <div class="afg">
+        <label>Status Baru</label>
+        <select name="status" class="afi" id="statusSelect">
+          <option value="pending">⏳ Pending</option>
+          <option value="confirmed">✅ Dikonfirmasi</option>
+          <option value="completed">🏁 Selesai</option>
+          <option value="cancelled">❌ Dibatalkan</option>
+        </select>
+      </div>
+      <div class="afg">
+        <label>Catatan Admin</label>
+        <textarea name="admin_notes" class="afi afi-ta" rows="3" id="adminNotes"
+                  placeholder="Catatan internal (tidak tampil ke penyewa)..."></textarea>
+      </div>
+      <div class="form-actions">
+        <button type="button" onclick="closeModal('statusModal')" class="btn btn-outline">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Status</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function openStatusModal(bookingId, currentStatus, adminNotes) {
+  document.getElementById('statusForm').action = `/admin/bookings/update-status/${bookingId}`;
+  document.getElementById('statusSelect').value = currentStatus;
+  document.getElementById('adminNotes').value = adminNotes;
+  openModal('statusModal');
+}
+
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+});
+</script>
+{% endblock %}

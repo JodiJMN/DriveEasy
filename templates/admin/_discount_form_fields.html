@@ -1,0 +1,57 @@
+{# Reusable form fields for Add & Edit discount modals #}
+<div class="afg-row">
+  <div class="afg">
+    <label>Nama Diskon <span class="req">*</span></label>
+    <input type="text" name="name" class="afi" required placeholder="e.g. Promo Lebaran">
+  </div>
+  <div class="afg">
+    <label>Kode Promo (opsional)</label>
+    <input type="text" name="code" class="afi" placeholder="LEBARAN10">
+  </div>
+</div>
+<div class="afg">
+  <label>Deskripsi</label>
+  <input type="text" name="description" class="afi" placeholder="Deskripsi singkat diskon...">
+</div>
+<div class="afg-row">
+  <div class="afg">
+    <label>Tipe Diskon <span class="req">*</span></label>
+    <select name="discount_type" class="afi" required>
+      <option value="percent">Persen (%)</option>
+      <option value="fixed">Nominal (Rp)</option>
+    </select>
+  </div>
+  <div class="afg">
+    <label>Nilai Diskon <span class="req">*</span></label>
+    <input type="number" name="discount_value" class="afi" required min="0" step="0.01"
+           placeholder="10 (%) atau 50000 (Rp)">
+  </div>
+</div>
+<div class="afg-row">
+  <div class="afg">
+    <label>Min. Hari Sewa</label>
+    <input type="number" name="min_days" class="afi" min="1" value="1">
+  </div>
+  <div class="afg">
+    <label>Maks. Penggunaan</label>
+    <input type="number" name="max_uses" class="afi" min="1" placeholder="Kosong = unlimited">
+  </div>
+</div>
+<div class="afg-row">
+  <div class="afg">
+    <label>Berlaku Mulai <span class="req">*</span></label>
+    <input type="date" name="valid_from" class="afi" required>
+  </div>
+  <div class="afg">
+    <label>Berlaku Hingga <span class="req">*</span></label>
+    <input type="date" name="valid_until" class="afi" required>
+  </div>
+</div>
+<div class="afg">
+  <label>Berlaku untuk Kategori</label>
+  <select name="apply_to" class="afi">
+    <option value="all">Semua Kategori</option>
+    <option value="personal">Personal saja</option>
+    <option value="corporate">Corporate saja</option>
+  </select>
+</div>

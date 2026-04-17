@@ -1,0 +1,117 @@
+{% extends "public/base.html" %}
+{% block title %}Booking Berhasil! | DriveEasy{% endblock %}
+
+{% block content %}
+<section class="success-page">
+  <div class="container">
+    <div class="success-card">
+      <div class="success-anim">✅</div>
+      <h1>Booking Berhasil! 🎉</h1>
+      <p>Terima kasih, <strong>{{ customer_name }}</strong>! Pesanan sedang kami proses.</p>
+
+      <div class="sbook-summary">
+        <h3>📋 Ringkasan Pemesanan</h3>
+        <div class="sbook-rows">
+          <div class="sbook-row"><span>ID Booking</span><strong class="id-val">#{{ booking_id }}</strong></div>
+          <div class="sbook-row"><span>Unit Mobil</span><strong>{{ car_name }}</strong></div>
+          <div class="sbook-row"><span>Tanggal Mulai</span><span>{{ start_date }}</span></div>
+          <div class="sbook-row"><span>Tanggal Selesai</span><span>{{ end_date }}</span></div>
+          <div class="sbook-row"><span>Durasi</span><span>{{ total_days }} hari</span></div>
+          {% if disc_amount and disc_amount|int > 0 %}
+          <div class="sbook-row" style="color:#22c55e">
+            <span>Diskon</span>
+            <span>- Rp {{ "{:,.0f}".format(disc_amount|int).replace(",",".") }}</span>
+          </div>
+          {% endif %}
+          <div class="sbook-row sbook-total">
+            <span>Total Estimasi</span>
+            <strong>Rp {{ "{:,.0f}".format(total_price|int).replace(",",".") }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <div class="ktp-ok">
+        <span>🪪</span>
+        <div>
+          <strong>Dokumen KTP/SIM berhasil diunggah</strong>
+          <small>Tim kami akan memverifikasi dalam 15 menit</small>
+        </div>
+      </div>
+
+      <div class="next-steps">
+        <h3>Langkah Selanjutnya</h3>
+        <div class="ns-list">
+          <div class="ns-item ns-done"><span>1</span><span>Form booking terisi ✓</span></div>
+          <div class="ns-item ns-done"><span>2</span><span>KTP/SIM terupload ✓</span></div>
+          <div class="ns-item ns-active"><span>3</span><span>Konfirmasi via WhatsApp ← <em>Sekarang</em></span></div>
+          <div class="ns-item"><span>4</span><span>Pembayaran &amp; Pengambilan Mobil</span></div>
+        </div>
+      </div>
+
+      <div class="success-actions">
+        <button class="btn btn-wa btn-lg" id="waBtn">💬 Konfirmasi via WhatsApp Sekarang</button>
+        <p class="wa-count">Mengarahkan ke WhatsApp dalam <strong id="counter">5</strong> detik...</p>
+        <a href="{{ url_for('index') }}" class="btn btn-outline">← Kembali ke Beranda</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const D = {
+  id:       "{{ booking_id }}",
+  car:      "{{ car_name }}",
+  name:     "{{ customer_name }}",
+  sd:       "{{ start_date }}",
+  ed:       "{{ end_date }}",
+  days:     "{{ total_days }}",
+  price:    "{{ total_price }}",
+  disc:     "{{ disc_amount }}",
+  waNum:    "{{ wa_admin_number }}"
+};
+
+function buildMsg() {
+  const total = parseInt(D.price).toLocaleString('id-ID');
+  const disc  = parseInt(D.disc || 0);
+  let lines = [
+    `Halo DriveEasy! 👋`,
+    ``,
+    `Saya ingin konfirmasi pemesanan berikut:`,
+    ``,
+    `📋 *Detail Booking #${D.id}*`,
+    `👤 Nama       : ${D.name}`,
+    `🚗 Unit Mobil : ${D.car}`,
+    `📅 Mulai      : ${D.sd}`,
+    `📅 Selesai    : ${D.ed}`,
+    `⏱️ Durasi     : ${D.days} hari`,
+  ];
+  if (disc > 0) lines.push(`🏷️ Diskon     : Rp ${disc.toLocaleString('id-ID')}`);
+  lines.push(`💰 Total Est. : Rp ${total}`);
+  lines.push(``);
+  lines.push(`🪪 *Dokumen KTP/SIM sudah diunggah ke sistem.*`);
+  lines.push(``);
+  lines.push(`Mohon konfirmasi ketersediaan dan detail pembayaran. Terima kasih! 🙏`);
+  return lines.join('\n');
+}
+
+function openWA() {
+  window.open(`https://wa.me/${D.waNum}?text=${encodeURIComponent(buildMsg())}`, '_blank');
+}
+
+let sec = 5;
+const counter = document.getElementById('counter');
+const t = setInterval(() => {
+  sec--;
+  if (counter) counter.textContent = sec;
+  if (sec <= 0) { clearInterval(t); openWA(); }
+}, 1000);
+
+document.getElementById('waBtn').addEventListener('click', () => {
+  clearInterval(t);
+  document.querySelector('.wa-count').style.display = 'none';
+  openWA();
+});
+</script>
+{% endblock %}

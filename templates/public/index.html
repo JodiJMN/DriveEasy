@@ -1,0 +1,283 @@
+{% extends "public/base.html" %}
+{% block title %}DriveEasy — Sewa Mobil Mudah, Nyaman & Terpercaya{% endblock %}
+
+{% block content %}
+
+<!-- ── HERO ───────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-bg">
+    <div class="hero-blob hero-blob-1"></div>
+    <div class="hero-blob hero-blob-2"></div>
+  </div>
+  <div class="container hero-inner">
+    <div class="hero-content">
+      <div class="hero-badge">🎉 Terpercaya Sejak 2018</div>
+      <h1 class="hero-title">
+        Sewa Mobil Impianmu<br>
+        <span class="hero-accent">Mudah & Terjangkau</span>
+      </h1>
+      <p class="hero-sub">
+        Pilihan armada terlengkap untuk perjalanan personal dan kebutuhan korporat.
+        Booking mudah, konfirmasi via WhatsApp!
+      </p>
+
+      <!-- Promo Banner -->
+      {% if promos %}
+      <div class="promo-scroll">
+        {% for p in promos %}
+        <div class="promo-chip">
+          🏷️ <strong>{{ p.name }}</strong> —
+          {% if p.discount_type == 'percent' %}
+            Hemat {{ p.discount_value|int }}%
+          {% else %}
+            Hemat {{ p.discount_value|currency }}
+          {% endif %}
+          {% if p.code %} • Kode: <code>{{ p.code }}</code>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Quick Search -->
+      <form action="{{ url_for('cars') }}" method="GET" class="hero-search">
+        <select name="category" class="hs-select">
+          <option value="">📂 Semua Kategori</option>
+          {% for cat in categories %}
+          <option value="{{ cat.slug }}"> {{ cat.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="transmission" class="hs-select">
+          <option value="">⚙️ Transmisi</option>
+          <option value="Matic">Matic</option>
+          <option value="Manual">Manual</option>
+        </select>
+        <select name="capacity" class="hs-select">
+          <option value="">👥 Kapasitas</option>
+          <option value="5">5+ Kursi</option>
+          <option value="7">7+ Kursi</option>
+          <option value="12">12+ Kursi</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-search">🔍 Cari Mobil</button>
+      </form>
+
+      <div class="hero-stats">
+        <div class="stat">
+          <strong>{{ stats.total_cars or '12' }}+</strong>
+          <span>Armada Tersedia</span>
+        </div>
+        <div class="stat-div"></div>
+        <div class="stat">
+          <strong>{{ stats.total_bookings or '500' }}+</strong>
+          <span>Perjalanan Selesai</span>
+        </div>
+        <div class="stat-div"></div>
+        <div class="stat">
+          <strong>4.9 ⭐</strong>
+          <span>Rating</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-card">
+        <div class="hero-card-img">
+          <img src="static/img/cars/alphard.jfif"
+               alt="Toyota Alphard Premium" loading="eager">
+        </div>
+        <div class="hero-card-body">
+          <span class="hc-name">Toyota Alphard</span>
+          <span class="hc-price">Rp 2.500.000<small>/hari</small></span>
+        </div>
+        <div class="hc-badge">⚡ Tersedia Sekarang</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── ENTRY CARDS ────────────────────────────────────── -->
+<section class="section-entry">
+  <div class="container">
+    <div class="sec-header">
+      <h2>Pilih Kebutuhan Sewamu</h2>
+      <p>Solusi kendaraan untuk setiap segmen kebutuhan</p>
+    </div>
+    <div class="entry-grid">
+      <a href="{{ url_for('cars', slug='personal') }}" class="entry-card entry-personal">
+        <div class="ec-icon">🚗</div>
+        <h3>Sewa Personal</h3>
+        <p>Liburan keluarga, jemput-antar, atau road trip. Mobil terlengkap harga ramah kantong.</p>
+        <ul>
+          <li>✅ City car & MPV keluarga</li>
+          <li>✅ Mulai dari Rp 280.000/hari</li>
+          <li>✅ Manual &amp; Matic tersedia</li>
+        </ul>
+        <span class="ec-cta">Lihat Armada Personal <span>→</span></span>
+      </a>
+      <a href="{{ url_for('cars', slug='corporate') }}" class="entry-card entry-corporate">
+        <div class="ec-icon">🏢</div>
+        <h3>Sewa Korporat</h3>
+        <p>Solusi transportasi bisnis profesional. Antar eksekutif hingga shuttle karyawan.</p>
+        <ul>
+          <li>✅ Luxury SUV &amp; Premium MPV</li>
+          <li>✅ Layanan 24 jam</li>
+          <li>✅ Invoicing &amp; kontrak khusus</li>
+        </ul>
+        <span class="ec-cta">Lihat Armada Korporat <span>→</span></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── HOW IT WORKS ───────────────────────────────────── -->
+<section class="section-how" id="cara-kerja">
+  <div class="container">
+    <div class="sec-header">
+      <h2>Cara Sewa Super Mudah</h2>
+      <p>Cukup 3 langkah, mobil siap meluncur!</p>
+    </div>
+    <div class="steps-row">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <div class="step-icon">🔍</div>
+        <h3>Pilih Mobil</h3>
+        <p>Browse koleksi armada. Filter sesuai transmisi, kapasitas, dan budget.</p>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <div class="step-icon">📋</div>
+        <h3>Isi Form Booking</h3>
+        <p>Lengkapi data diri dan upload KTP atau SIM sebagai verifikasi identitas.</p>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <div class="step-icon">💬</div>
+        <h3>Konfirmasi via WA</h3>
+        <p>Tim kami konfirmasi langsung via WhatsApp. Bayar &amp; mobil siap dijemput!</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FEATURED CARS ──────────────────────────────────── -->
+{% if featured_cars %}
+<section class="section-featured">
+  <div class="container">
+    <div class="sec-header sec-header-flex">
+      <div>
+        <h2>Mobil Pilihan Terpopuler</h2>
+        <p>Armada unggulan yang paling banyak dipesan</p>
+      </div>
+      <a href="{{ url_for('cars') }}" class="btn btn-outline">Lihat Semua →</a>
+    </div>
+    <div class="car-grid">
+      {% for car in featured_cars %}
+      <div class="car-card reveal">
+        <div class="car-card-img">
+          <img src="{{ car_image_url(car) }}" alt="{{ car.name }}" loading="lazy">
+          <span class="car-badge car-badge-{{ car.category_slug }}">{{ car.category_name }}</span>
+        </div>
+        <div class="car-card-body">
+          <div class="car-meta">
+            <span class="car-brand">{{ car.brand }}</span>
+          </div>
+          <h3 class="car-name">{{ car.name }}</h3>
+          <div class="car-specs">
+            <span class="spec">
+              {% if car.transmission == 'Matic' %}⚙️{% else %}🔧{% endif %}
+              {{ car.transmission }}
+            </span>
+            <span class="spec">👥 {{ car.capacity }} Kursi</span>
+          </div>
+          <div class="car-footer">
+            <div class="car-price-wrap">
+              <small>Mulai dari</small>
+              <div class="car-price">
+                {{ car.price_per_day | currency }}<span>/hari</span>
+              </div>
+            </div>
+            <a href="{{ url_for('booking', car_id=car.id) }}" class="btn btn-primary btn-sm">
+              Pilih Mobil
+            </a>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ── TRUST / USP ────────────────────────────────────── -->
+<section class="section-trust">
+  <div class="container">
+    <div class="trust-grid">
+      <div class="trust-item">
+        <div class="trust-icon">🛡️</div>
+        <h4>Armada Terawat</h4>
+        <p>Setiap kendaraan melalui pengecekan rutin mekanik bersertifikat.</p>
+      </div>
+      <div class="trust-item">
+        <div class="trust-icon">⏱️</div>
+        <h4>Respons Cepat</h4>
+        <p>Konfirmasi booking dalam 15 menit. Layanan WA aktif 24/7.</p>
+      </div>
+      <div class="trust-item">
+        <div class="trust-icon">💸</div>
+        <h4>Harga Transparan</h4>
+        <p>Tidak ada biaya tersembunyi. Harga yang kamu lihat adalah harga final.</p>
+      </div>
+      <div class="trust-item">
+        <div class="trust-icon">📍</div>
+        <h4>Antar-Jemput</h4>
+        <p>Layanan pengiriman kendaraan langsung ke lokasi kamu.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── REVIEWS PELANGGAN ────────────────────────────── -->
+{% if approved_reviews %}
+<section class="section-reviews" style="padding:70px 0;background:#f8fafc;">
+  <div class="container">
+    <div class="sec-header" style="text-align:center;margin-bottom:40px;">
+      <h2 style="font-size:clamp(1.5rem,3vw,2rem);font-weight:800;color:#1e293b;margin:0 0 8px;">Apa Kata Pelanggan Kami?</h2>
+      <p style="color:#64748b;font-size:.95rem;">Ulasan nyata dari ribuan pelanggan yang telah menggunakan DriveEasy</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:22px;">
+      {% for rv in approved_reviews %}
+      <div style="background:#fff;border-radius:18px;box-shadow:0 2px 18px rgba(0,0,0,.07);padding:26px;position:relative;border:1px solid #f1f5f9;transition:box-shadow .2s,transform .2s;">
+        <div style="position:absolute;top:18px;right:20px;font-size:2.4rem;color:#e2e8f0;font-family:Georgia,serif;line-height:1;">&ldquo;</div>
+        <div style="color:#f59e0b;font-size:1.1rem;letter-spacing:2px;margin-bottom:10px;">
+          {% for i in range(rv.rating) %}★{% endfor %}{% for i in range(5 - rv.rating) %}☆{% endfor %}
+        </div>
+        <p style="color:#334155;font-size:.93rem;line-height:1.65;margin:0 0 16px;">{{ rv.message|truncate(150) }}</p>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#0ea5e9,#2563eb);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.95rem;flex-shrink:0;">{{ rv.name[0]|upper }}</div>
+          <div>
+            <div style="font-weight:600;font-size:.88rem;color:#1e293b;">{{ rv.name }}</div>
+            <div style="font-size:.78rem;color:#94a3b8;">{{ rv.created_at.strftime('%d %b %Y') if rv.created_at else '' }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="text-align:center;margin-top:36px;">
+      <a href="{{ url_for('feedback') }}" class="btn btn-primary">⭐ Bagikan Pengalaman Anda</a>
+    </div>
+  </div>
+</section>
+{% else %}
+<!-- CTA Masukan jika belum ada review -->
+<section style="padding:60px 0;background:linear-gradient(135deg,#0f172a,#1e3a5f);text-align:center;">
+  <div class="container">
+    <div style="font-size:2.5rem;margin-bottom:12px;">⭐</div>
+    <h2 style="color:#fff;font-size:1.6rem;font-weight:800;margin:0 0 10px;">Jadilah yang Pertama Memberi Ulasan!</h2>
+    <p style="color:rgba(255,255,255,.75);margin:0 0 24px;">Bagikan pengalaman Anda dan bantu pelanggan lain membuat keputusan terbaik.</p>
+    <a href="{{ url_for('feedback') }}" class="btn btn-primary">⭐ Tulis Ulasan Sekarang</a>
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

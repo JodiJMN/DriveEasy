@@ -1,0 +1,10 @@
+{% extends "public/base.html" %}
+{% block title %}404 — Halaman Tidak Ditemukan{% endblock %}
+{% block content %}
+<div class="page-404">
+  <div>🚗💨</div>
+  <h1>404</h1>
+  <p>Halaman yang kamu cari tidak ditemukan atau sudah dipindah.</p>
+  <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">← Kembali ke Beranda</a>
+</div>
+{% endblock %}

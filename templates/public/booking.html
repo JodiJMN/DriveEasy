@@ -1,0 +1,308 @@
+{% extends "public/base.html" %}
+{% block title %}Booking {{ car.name }} | DriveEasy{% endblock %}
+
+{% block content %}
+<section class="page-hdr page-hdr-sm">
+  <div class="container">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('index') }}">Beranda</a>
+      <span>›</span>
+      <a href="{{ url_for('cars', slug=car.category_slug) }}">{{ car.category_name }}</a>
+      <span>›</span>
+      <span>Booking {{ car.name }}</span>
+    </nav>
+    <h1 class="page-hdr-title">📋 Form Pemesanan</h1>
+  </div>
+</section>
+
+<section class="booking-page">
+  <div class="container">
+    <div class="booking-layout">
+
+      <!-- Form Kiri -->
+      <div class="bform-wrap">
+        <div class="bcard">
+          <div class="bcard-header">
+            <h2>Data Penyewa</h2>
+            <p>Pastikan data sesuai dengan KTP/SIM Anda</p>
+          </div>
+          <form method="POST" enctype="multipart/form-data"
+                class="bform" id="bookingForm" novalidate>
+
+            <!-- Nama -->
+            <div class="fg">
+              <label>👤 Nama Lengkap <span class="req">*</span></label>
+              <input type="text" name="customer_name" class="fi"
+                     placeholder="Sesuai KTP/SIM"
+                     value="{{ form_data.get('customer_name','') }}" required>
+            </div>
+
+            <!-- WA -->
+            <div class="fg">
+              <label>📱 Nomor WhatsApp <span class="req">*</span></label>
+              <div class="fi-prefix">
+                <span>+62</span>
+                <input type="tel" name="phone_number" class="fi fi-pfx"
+                       placeholder="812-3456-7890"
+                       value="{{ form_data.get('phone_number','') }}" required>
+              </div>
+              <small>Konfirmasi booking dikirim ke nomor ini</small>
+            </div>
+
+            <!-- Tanggal -->
+            <div class="fg-row">
+              <div class="fg">
+                <label>📅 Tanggal Mulai <span class="req">*</span></label>
+                <input type="date" name="start_date" id="startDate" class="fi"
+                       value="{{ form_data.get('start_date','') }}" required>
+              </div>
+              <div class="fg">
+                <label>📅 Tanggal Selesai <span class="req">*</span></label>
+                <input type="date" name="end_date" id="endDate" class="fi"
+                       value="{{ form_data.get('end_date','') }}" required>
+              </div>
+            </div>
+
+            <!-- Price Calc -->
+            <div class="price-calc" id="priceCalc" style="display:none">
+              <div class="pc-row"><span>Durasi Sewa</span><span id="pcDays">-</span></div>
+              <div class="pc-row"><span>Harga per Hari</span><span>{{ car.price_per_day | currency }}</span></div>
+              <div class="pc-row pc-subtotal"><span>Subtotal</span><span id="pcSub">-</span></div>
+              <div class="pc-row pc-disc" id="pcDiscRow" style="display:none">
+                <span>Diskon</span><span id="pcDisc" style="color:#22c55e">-</span>
+              </div>
+              <div class="pc-row pc-total"><span>Total Estimasi</span><span id="pcTotal" class="pc-total-val">-</span></div>
+            </div>
+
+            <!-- Diskon -->
+            {% if discounts %}
+            <div class="fg">
+              <label>🏷️ Pilih Diskon (Opsional)</label>
+              <div class="disc-list">
+                <label class="disc-opt">
+                  <input type="radio" name="discount_id" value="" checked>
+                  <div class="disc-box">
+                    <span class="disc-name">Tanpa Diskon</span>
+                  </div>
+                </label>
+                {% for d in discounts %}
+                <label class="disc-opt">
+                  <input type="radio" name="discount_id" value="{{ d.id }}"
+                         data-type="{{ d.discount_type }}"
+                         data-val="{{ d.discount_value }}"
+                         data-min="{{ d.min_days }}">
+                  <div class="disc-box">
+                    <div class="disc-box-top">
+                      <span class="disc-name">{{ d.name }}</span>
+                      <span class="disc-val">
+                        {% if d.discount_type == 'percent' %}
+                          -{{ d.discount_value|int }}%
+                        {% else %}
+                          -{{ d.discount_value | currency }}
+                        {% endif %}
+                      </span>
+                    </div>
+                    {% if d.code %}<code class="disc-code">{{ d.code }}</code>{% endif %}
+                    {% if d.description %}<small>{{ d.description }}</small>{% endif %}
+                    <small class="disc-min">Min. {{ d.min_days }} hari sewa</small>
+                  </div>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Catatan -->
+            <div class="fg">
+              <label>💬 Catatan Tambahan</label>
+              <textarea name="notes" class="fi fi-ta" rows="3"
+                        placeholder="Contoh: siapkan baby seat, antar ke bandara, dll.">{{ form_data.get('notes','') }}</textarea>
+            </div>
+
+            <!-- Upload KTP -->
+            <div class="fg">
+              <label>🪪 Upload KTP atau SIM <span class="req">*</span></label>
+              <div class="upload-zone" id="uploadZone">
+                <input type="file" name="ktp_file" id="ktpFile" class="upload-input"
+                       accept=".jpg,.jpeg,.png,.pdf" required>
+                <div class="upload-ph" id="uploadPh">
+                  <span style="font-size:40px">📂</span>
+                  <strong>Klik atau seret file ke sini</strong>
+                  <small>JPG, PNG, atau PDF — Maks. 5 MB</small>
+                </div>
+                <div class="upload-prev" id="uploadPrev" style="display:none">
+                  <span>✅</span>
+                  <span id="uploadName"></span>
+                  <button type="button" id="removeFile">✕</button>
+                </div>
+              </div>
+              <small>🔒 Data Anda aman dan terenkripsi</small>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
+              <span id="submitTxt">Lanjut Konfirmasi via WhatsApp →</span>
+              <span id="submitLoad" style="display:none">⏳ Memproses...</span>
+            </button>
+            <p class="form-note">
+              Dengan melanjutkan, Anda menyetujui <a href="#">Syarat &amp; Ketentuan</a> DriveEasy.
+            </p>
+          </form>
+        </div>
+      </div>
+
+      <!-- Summary Kanan -->
+      <div class="bsummary">
+        <div class="bsum-card">
+          <div class="bsum-card-header">🚗 Mobil yang Dipilih</div>
+          <img src="{{ car_image_url(car) }}" alt="{{ car.name }}" class="bsum-img"
+               onerror="this.src='https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=600'">
+          <div class="bsum-body">
+            <div class="bsum-brand">{{ car.brand }}</div>
+            <h4 class="bsum-name">{{ car.name }}</h4>
+            <div class="car-specs" style="margin-bottom:12px">
+              <span class="spec">
+                {% if car.transmission == 'Matic' %}⚙️{% else %}🔧{% endif %}
+                {{ car.transmission }}
+              </span>
+              <span class="spec">👥 {{ car.capacity }} Kursi</span>
+              {% if car.year %}<span class="spec">📅 {{ car.year }}</span>{% endif %}
+            </div>
+            <div class="bsum-price">
+              <span>Harga per Hari</span>
+              <strong>{{ car.price_per_day | currency }}</strong>
+            </div>
+            {% if car.description %}
+            <p class="bsum-desc">{{ car.description }}</p>
+            {% endif %}
+          </div>
+          <div class="bsum-cat bsum-cat-{{ car.category_slug }}">
+            Kategori: {{ car.category_name }}
+          </div>
+        </div>
+
+        <!-- Kebijakan -->
+        <div class="policy-box">
+          <h4>📌 Ketentuan Sewa</h4>
+          <ul>
+            <li>Usia minimum penyewa 21 tahun</li>
+            <li>SIM aktif wajib dibawa saat pengambilan</li>
+            <li>Bahan bakar tanggungan penyewa</li>
+            <li>Keterlambatan dikenai denda harian</li>
+            <li>Kerusakan non-wajar ditanggung penyewa</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const PRICE_PER_DAY = {{ car.price_per_day }};
+const BLOCKED_RANGES = {{ blocked_ranges | tojson }};
+
+// Set min dates
+const today = new Date().toISOString().split('T')[0];
+const startEl = document.getElementById('startDate');
+const endEl   = document.getElementById('endDate');
+startEl.min = today;
+endEl.min   = today;
+
+function isDateBlocked(dateStr) {
+  const d = new Date(dateStr);
+  return BLOCKED_RANGES.some(r => {
+    return d >= new Date(r.from) && d <= new Date(r.to);
+  });
+}
+
+// Kalkulasi harga
+function calcPrice() {
+  const sd = startEl.value, ed = endEl.value;
+  const discRadio = document.querySelector('input[name="discount_id"]:checked');
+  const calcEl = document.getElementById('priceCalc');
+
+  if (!sd || !ed) { calcEl.style.display = 'none'; return; }
+
+  const days = Math.round((new Date(ed) - new Date(sd)) / 86400000);
+  if (days <= 0) { calcEl.style.display = 'none'; return; }
+
+  const subtotal = days * PRICE_PER_DAY;
+  let discAmt = 0;
+
+  if (discRadio && discRadio.value) {
+    const dtype = discRadio.dataset.type;
+    const dval  = parseFloat(discRadio.dataset.val);
+    const dmin  = parseInt(discRadio.dataset.min);
+    if (days >= dmin) {
+      discAmt = dtype === 'percent' ? subtotal * dval / 100 : dval;
+    }
+  }
+
+  const total = Math.max(0, subtotal - discAmt);
+
+  document.getElementById('pcDays').textContent  = days + ' hari';
+  document.getElementById('pcSub').textContent   = 'Rp ' + subtotal.toLocaleString('id-ID');
+  document.getElementById('pcTotal').textContent = 'Rp ' + total.toLocaleString('id-ID');
+
+  const discRow = document.getElementById('pcDiscRow');
+  if (discAmt > 0) {
+    document.getElementById('pcDisc').textContent = '- Rp ' + discAmt.toLocaleString('id-ID');
+    discRow.style.display = 'flex';
+  } else {
+    discRow.style.display = 'none';
+  }
+
+  calcEl.style.display = 'flex';
+}
+
+startEl.addEventListener('change', function() {
+  endEl.min = this.value;
+  if (endEl.value && endEl.value <= this.value) endEl.value = '';
+  calcPrice();
+});
+endEl.addEventListener('change', calcPrice);
+document.querySelectorAll('input[name="discount_id"]').forEach(r =>
+  r.addEventListener('change', calcPrice)
+);
+
+// Upload UX
+const zone = document.getElementById('uploadZone');
+const inp  = document.getElementById('ktpFile');
+const ph   = document.getElementById('uploadPh');
+const prev = document.getElementById('uploadPrev');
+const name = document.getElementById('uploadName');
+
+zone.addEventListener('click', e => { if (e.target.id !== 'removeFile') inp.click(); });
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragging'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragging'));
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.classList.remove('dragging');
+  if (e.dataTransfer.files[0]) { inp.files = e.dataTransfer.files; showFile(e.dataTransfer.files[0]); }
+});
+inp.addEventListener('change', () => { if (inp.files[0]) showFile(inp.files[0]); });
+
+function showFile(f) {
+  name.textContent = f.name;
+  ph.style.display = 'none';
+  prev.style.display = 'flex';
+  zone.classList.add('has-file');
+}
+document.getElementById('removeFile').addEventListener('click', e => {
+  e.stopPropagation();
+  inp.value = '';
+  ph.style.display = 'flex';
+  prev.style.display = 'none';
+  zone.classList.remove('has-file');
+});
+
+// Submit loading
+document.getElementById('bookingForm').addEventListener('submit', function() {
+  document.getElementById('submitTxt').style.display  = 'none';
+  document.getElementById('submitLoad').style.display = 'inline';
+  document.getElementById('submitBtn').disabled = true;
+});
+</script>
+{% endblock %}

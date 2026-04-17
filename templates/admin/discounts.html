@@ -1,0 +1,163 @@
+{% extends "admin/base.html" %}
+{% block title %}Diskon & Promo — Admin DriveEasy{% endblock %}
+{% block page_title %}Diskon & Promo{% endblock %}
+
+{% block content %}
+
+<div class="asec-header" style="margin-bottom:20px">
+  <h2>Kelola Diskon ({{ discounts|length }})</h2>
+  <button class="btn btn-primary" onclick="openModal('addModal')">🏷️ Tambah Diskon Baru</button>
+</div>
+
+<!-- Discounts Table -->
+<div class="table-wrap">
+  <table class="admin-table">
+    <thead>
+      <tr>
+        <th>Nama Diskon</th>
+        <th>Kode</th>
+        <th>Tipe</th>
+        <th>Nilai</th>
+        <th>Berlaku</th>
+        <th>Digunakan</th>
+        <th>Status</th>
+        <th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in discounts %}
+      <tr>
+        <td>
+          <strong>{{ d.name }}</strong>
+          {% if d.description %}<br><small>{{ d.description }}</small>{% endif %}
+          <br><small style="color:#94a3b8">Min. {{ d.min_days }} hari • {{ d.apply_to }}</small>
+        </td>
+        <td>
+          {% if d.code %}
+          <code class="disc-code-tag">{{ d.code }}</code>
+          {% else %}
+          <span style="color:#94a3b8">—</span>
+          {% endif %}
+        </td>
+        <td>{{ 'Persen (%)' if d.discount_type == 'percent' else 'Nominal (Rp)' }}</td>
+        <td>
+          <strong style="color:#0070e0">
+            {% if d.discount_type == 'percent' %}
+              {{ d.discount_value|int }}%
+            {% else %}
+              {{ d.discount_value | currency }}
+            {% endif %}
+          </strong>
+        </td>
+        <td>
+          <small>{{ d.valid_from }} s/d</small><br>
+          <small>{{ d.valid_until }}</small>
+        </td>
+        <td>
+          {{ d.used_count }}{% if d.max_uses %}/{{ d.max_uses }}{% endif %}
+        </td>
+        <td>
+          <span class="status-badge {% if d.is_active %}status-confirmed{% else %}status-cancelled{% endif %}">
+            {{ 'Aktif' if d.is_active else 'Nonaktif' }}
+          </span>
+        </td>
+        <td>
+          <button class="btn btn-outline btn-xs"
+                  onclick="openEdit({{ d | tojson }})">✏️ Edit</button>
+          <form method="POST" action="{{ url_for('admin_discount_delete', disc_id=d.id) }}"
+                style="display:inline"
+                onsubmit="return confirm('Hapus diskon ini?')">
+            <button type="submit" class="btn btn-danger btn-xs">🗑️</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="td-empty">Belum ada diskon. Tambahkan diskon pertama!</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>🏷️ Tambah Diskon Baru</h3>
+      <button onclick="closeModal('addModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin_discount_add') }}" class="admin-form">
+      {% include 'admin/_discount_form_fields.html' %}
+      <div class="form-actions">
+        <button type="button" onclick="closeModal('addModal')" class="btn btn-outline">Batal</button>
+        <button type="submit" class="btn btn-primary">Tambah Diskon</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>✏️ Edit Diskon</h3>
+      <button onclick="closeModal('editModal')">✕</button>
+    </div>
+    <form method="POST" id="editForm" class="admin-form">
+      {% include 'admin/_discount_form_fields.html' %}
+      <div class="afg-row">
+        <div class="afg" style="flex:none">
+          <label class="toggle-label">
+            <input type="checkbox" name="is_active" id="editIsActive">
+            <span>Diskon Aktif</span>
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" onclick="closeModal('editModal')" class="btn btn-outline">Batal</button>
+        <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+// Close on backdrop click
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+});
+
+function openEdit(d) {
+  const form = document.getElementById('editForm');
+  form.action = `/admin/discounts/edit/${d.id}`;
+
+  const set = (name, val) => {
+    const el = form.querySelector(`[name="${name}"]`);
+    if (el) el.value = val ?? '';
+  };
+  set('code',           d.code);
+  set('name',           d.name);
+  set('description',    d.description);
+  set('discount_type',  d.discount_type);
+  set('discount_value', d.discount_value);
+  set('min_days',       d.min_days);
+  set('max_uses',       d.max_uses);
+  set('valid_from',     d.valid_from ? d.valid_from.split('T')[0] : '');
+  set('valid_until',    d.valid_until ? d.valid_until.split('T')[0] : '');
+  set('apply_to',       d.apply_to);
+  document.getElementById('editIsActive').checked = !!d.is_active;
+
+  openModal('editModal');
+}
+</script>
+{% endblock %}

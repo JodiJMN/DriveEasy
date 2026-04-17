@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+{% block title %}Kelola Mobil — Admin DriveEasy{% endblock %}
+{% block page_title %}Kelola Armada Mobil{% endblock %}
+
+{% block content %}
+
+<div class="asec-header" style="margin-bottom:20px">
+  <h2>Daftar Armada ({{ cars_list|length }} unit)</h2>
+  <a href="{{ url_for('admin_car_add') }}" class="btn btn-primary">➕ Tambah Mobil Baru</a>
+</div>
+
+<!-- Filter by Category -->
+<div class="tab-filter" style="margin-bottom:20px">
+  <button class="tf-btn active" data-cat="all">Semua</button>
+  {% for cat in categories %}
+  <button class="tf-btn" data-cat="{{ cat.slug }}">{{ cat.icon }} {{ cat.name }}</button>
+  {% endfor %}
+</div>
+
+<!-- Cars Grid -->
+<div class="admin-cars-grid" id="carsGrid">
+  {% for car in cars_list %}
+  <div class="acar-card" data-cat="{{ car.category_slug }}">
+    <div class="acar-img">
+      <img src="{{ car_image_url(car) }}" alt="{{ car.name }}"
+           onerror="this.src='https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=300'">
+      <div class="acar-img-overlay">
+        <a href="{{ url_for('admin_car_edit', car_id=car.id) }}" class="btn btn-sm btn-white">✏️ Edit</a>
+      </div>
+      <span class="acar-cat-badge acar-cat-{{ car.category_slug }}">{{ car.category_name }}</span>
+    </div>
+
+    <div class="acar-body">
+      <div class="acar-top">
+        <div>
+          <div class="acar-brand">{{ car.brand }}</div>
+          <h4 class="acar-name">{{ car.name }}</h4>
+        </div>
+        <!-- Toggle ketersediaan -->
+        <label class="toggle-switch" title="Toggle Ketersediaan">
+          <input type="checkbox" class="toggle-input"
+                 data-car-id="{{ car.id }}"
+                 {% if car.is_available %}checked{% endif %}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="acar-specs">
+        <span>{% if car.transmission == 'Matic' %}⚙️{% else %}🔧{% endif %} {{ car.transmission }}</span>
+        <span>👥 {{ car.capacity }}</span>
+        {% if car.year %}<span>📅 {{ car.year }}</span>{% endif %}
+      </div>
+
+      <div class="acar-price">{{ car.price_per_day | currency }}<small>/hari</small></div>
+
+      <div class="acar-actions">
+        <a href="{{ url_for('admin_car_edit', car_id=car.id) }}"
+           class="btn btn-outline btn-sm">✏️ Edit</a>
+        <a href="{{ url_for('admin_availability', car_id=car.id) }}"
+           class="btn btn-outline btn-sm">📅 Jadwal</a>
+        <form method="POST" action="{{ url_for('admin_car_delete', car_id=car.id) }}"
+              style="display:inline"
+              onsubmit="return confirm('Yakin hapus mobil ini?')">
+          <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <p style="grid-column:1/-1;text-align:center;padding:60px;color:#94a3b8">
+    Belum ada mobil. <a href="{{ url_for('admin_car_add') }}">Tambah sekarang →</a>
+  </p>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Category filter tabs
+document.querySelectorAll('.tf-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const cat = this.dataset.cat;
+    document.querySelectorAll('.acar-card').forEach(card => {
+      card.style.display = (cat === 'all' || card.dataset.cat === cat) ? '' : 'none';
+    });
+  });
+});
+
+// AJAX toggle availability
+document.querySelectorAll('.toggle-input').forEach(inp => {
+  inp.addEventListener('change', async function() {
+    const carId = this.dataset.carId;
+    const res = await fetch(`/admin/cars/toggle/${carId}`, {method:'POST'});
+    const data = await res.json();
+    if (!data.ok) {
+      this.checked = !this.checked; // revert
+      alert('Gagal mengubah status.');
+    }
+  });
+});
+</script>
+{% endblock %}

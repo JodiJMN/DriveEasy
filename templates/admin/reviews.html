@@ -1,0 +1,178 @@
+{% extends "admin/base.html" %}
+{% block title %}Ulasan Pelanggan — Admin DriveEasy{% endblock %}
+{% block page_title %}⭐ Ulasan Pelanggan{% endblock %}
+
+{% block content %}
+
+<!-- Stats Strip -->
+<div class="stat-grid" style="margin-bottom:24px;">
+  <div class="stat-card stat-yellow">
+    <div class="sc-icon">⭐</div>
+    <div class="sc-body">
+      <div class="sc-val">{{ rev_stats.total or 0 }}</div>
+      <div class="sc-label">Total Ulasan</div>
+    </div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="sc-icon">✅</div>
+    <div class="sc-body">
+      <div class="sc-val">{{ rev_stats.approved or 0 }}</div>
+      <div class="sc-label">Ditampilkan</div>
+    </div>
+  </div>
+  <div class="stat-card stat-blue">
+    <div class="sc-icon">📊</div>
+    <div class="sc-body">
+      <div class="sc-val">
+        {% if rev_stats.avg_rating %}
+          {{ rev_stats.avg_rating }} ★
+        {% else %}—{% endif %}
+      </div>
+      <div class="sc-label">Rata-rata Rating</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter & Actions Bar -->
+<div class="admin-section">
+  <div class="asec-header" style="flex-wrap:wrap;gap:10px;">
+    <h2>Daftar Ulasan</h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <a href="{{ url_for('admin_reviews') }}"
+         class="btn btn-outline btn-sm {% if not status_filter %}active{% endif %}">Semua</a>
+      <a href="{{ url_for('admin_reviews', status='approved') }}"
+         class="btn btn-outline btn-sm {% if status_filter=='approved' %}active{% endif %}">Ditampilkan</a>
+      <a href="{{ url_for('admin_reviews', status='pending') }}"
+         class="btn btn-outline btn-sm {% if status_filter=='pending' %}active{% endif %}">Disembunyikan</a>
+      <a href="{{ url_for('feedback') }}" target="_blank" class="btn btn-outline btn-sm">
+        🔗 Lihat Form Publik
+      </a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="admin-table" id="reviewsTable">
+      <thead>
+        <tr>
+          <th style="width:50px">#ID</th>
+          <th>Nama</th>
+          <th style="width:80px">Rating</th>
+          <th>Pesan</th>
+          <th style="width:130px">Tanggal</th>
+          <th style="width:100px">Status</th>
+          <th style="width:140px">Aksi</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rv in reviews %}
+        <tr id="row-{{ rv.id }}" {% if not rv.is_approved %}style="opacity:.55;"{% endif %}>
+          <td><strong>#{{ rv.id }}</strong></td>
+          <td>
+            <div style="font-weight:600;">{{ rv.name }}</div>
+            {% if rv.email %}
+            <small style="color:#6b7280;">{{ rv.email }}</small>
+            {% endif %}
+          </td>
+          <td>
+            <span style="color:#f59e0b;font-size:1rem;letter-spacing:1px;">
+              {% for i in range(rv.rating) %}★{% endfor %}{% for i in range(5 - rv.rating) %}☆{% endfor %}
+            </span>
+            <small style="color:#6b7280;display:block;">{{ rv.rating }}/5</small>
+          </td>
+          <td style="max-width:320px;">
+            <span class="rv-msg-preview" style="display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:320px;">{{ rv.message }}</span>
+            <button class="btn btn-outline btn-xs rv-expand-btn" data-id="{{ rv.id }}" style="margin-top:4px;font-size:.75rem;">Baca selengkapnya</button>
+            <p class="rv-msg-full" id="full-{{ rv.id }}" style="display:none;white-space:pre-line;margin:0;color:#374151;">{{ rv.message }}</p>
+          </td>
+          <td>
+            <small>{{ rv.created_at.strftime('%d %b %Y') if rv.created_at else '—' }}</small><br>
+            <small style="color:#9ca3af;">{{ rv.created_at.strftime('%H:%M') if rv.created_at else '' }}</small>
+          </td>
+          <td>
+            <span class="rv-badge {% if rv.is_approved %}rv-badge-show{% else %}rv-badge-hide{% endif %}"
+                  id="badge-{{ rv.id }}">
+              {{ '✅ Tampil' if rv.is_approved else '🚫 Sembunyi' }}
+            </span>
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <!-- Toggle Approve -->
+              <button class="btn btn-outline btn-xs rv-toggle-btn"
+                      data-id="{{ rv.id }}"
+                      data-approved="{{ rv.is_approved }}"
+                      title="{{ 'Sembunyikan' if rv.is_approved else 'Tampilkan' }}">
+                {{ '🚫 Sembunyikan' if rv.is_approved else '✅ Tampilkan' }}
+              </button>
+              <!-- Delete -->
+              <form method="POST"
+                    action="{{ url_for('admin_review_delete', rev_id=rv.id) }}"
+                    onsubmit="return confirm('Hapus ulasan dari {{ rv.name }}?');">
+                <button type="submit" class="btn btn-xs" style="background:#ef4444;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;">🗑️</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="td-empty">Belum ada ulasan.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_head %}
+<style>
+.rv-badge {
+  display: inline-block; padding: 4px 10px; border-radius: 50px;
+  font-size: .78rem; font-weight: 600;
+}
+.rv-badge-show { background: #dcfce7; color: #15803d; }
+.rv-badge-hide { background: #fee2e2; color: #b91c1c; }
+tr.row-hidden { opacity: .5; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Toggle approve/hide via AJAX
+document.querySelectorAll('.rv-toggle-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const id = this.dataset.id;
+    fetch('/admin/reviews/toggle/' + id, { method: 'POST' })
+      .then(r => r.json())
+      .then(data => {
+        if(!data.ok) return;
+        const row   = document.getElementById('row-' + id);
+        const badge = document.getElementById('badge-' + id);
+        const isApproved = data.is_approved;
+        // Update row style
+        row.style.opacity = isApproved ? '1' : '.55';
+        // Update badge
+        badge.textContent = isApproved ? '✅ Tampil' : '🚫 Sembunyi';
+        badge.className = 'rv-badge ' + (isApproved ? 'rv-badge-show' : 'rv-badge-hide');
+        // Update button
+        this.dataset.approved = isApproved;
+        this.textContent = isApproved ? '🚫 Sembunyikan' : '✅ Tampilkan';
+      })
+      .catch(() => alert('Gagal mengubah status. Coba lagi.'));
+  });
+});
+
+// Expand/collapse pesan
+document.querySelectorAll('.rv-expand-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const id = this.dataset.id;
+    const preview = this.previousElementSibling;
+    const full    = document.getElementById('full-' + id);
+    const isOpen  = full.style.display !== 'none';
+    preview.style.display = isOpen ? 'block' : 'none';
+    full.style.display    = isOpen ? 'none'  : 'block';
+    this.textContent      = isOpen ? 'Baca selengkapnya' : 'Tutup';
+  });
+});
+</script>
+{% endblock %}

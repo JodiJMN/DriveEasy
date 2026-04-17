@@ -1,0 +1,157 @@
+{% extends "public/base.html" %}
+
+{% block title %}
+  {% if category %}Armada {{ category.name }}{% else %}Semua Mobil{% endif %} | DriveEasy
+{% endblock %}
+
+{% block content %}
+
+<!-- Page Header -->
+<section class="page-hdr {% if active_slug == 'corporate' %}page-hdr-corp{% endif %}">
+  <div class="container">
+    <nav class="breadcrumb">
+      <a href="{{ url_for('index') }}">Beranda</a>
+      <span>›</span>
+      <span>{% if category %}{{ category.name }}{% else %}Semua Mobil{% endif %}</span>
+    </nav>
+    <h1 class="page-hdr-title">
+      {% if category %}
+        {{ category.name }}
+      {% else %}
+        Semua Armada Tersedia
+      {% endif %}
+    </h1>
+    <p class="page-hdr-desc">
+      {% if category %}{{ category.description }}{% else %}Temukan mobil terbaik sesuai kebutuhan dan budgetmu.{% endif %}
+    </p>
+
+    <!-- Category Tabs -->
+    <div class="cat-tabs">
+      <a href="{{ url_for('cars') }}"
+         class="cat-tab {% if active_slug == 'all' %}active{% endif %}">
+        🚗 Semua
+      </a>
+      {% for cat in categories %}
+      <a href="{{ url_for('cars', slug=cat.slug) }}"
+         class="cat-tab {% if active_slug == cat.slug %}active{% endif %}">
+        {{ cat.name }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- Content -->
+<section class="cars-page">
+  <div class="container">
+    <div class="cars-layout">
+
+      <!-- Filter Sidebar -->
+      <aside class="filter-panel">
+        <h3 class="fp-title">🎯 Filter Mobil</h3>
+        <form method="GET"
+              action="{{ url_for('cars', slug=active_slug if active_slug != 'all' else None) }}"
+              id="filterForm">
+
+          <div class="fp-group">
+            <h4>⚙️ Transmisi</h4>
+            {% for val, label in [('','Semua'),('Matic','Matic'),('Manual','Manual')] %}
+            <label class="fp-radio">
+              <input type="radio" name="transmission" value="{{ val }}"
+                     {% if filter_tx == val %}checked{% endif %}>
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+          <div class="fp-group">
+            <h4>👥 Min. Kapasitas</h4>
+            {% for val, label in [('','Semua'),('5','5+ Kursi'),('7','7+ Kursi'),('12','12+ Kursi')] %}
+            <label class="fp-radio">
+              <input type="radio" name="capacity" value="{{ val }}"
+                     {% if filter_cap == val %}checked{% endif %}>
+              <span>{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width:100%">Terapkan</button>
+          {% if filter_tx or filter_cap %}
+          <a href="{{ url_for('cars', slug=active_slug if active_slug != 'all' else None) }}"
+             class="btn btn-outline" style="width:100%;margin-top:8px;text-align:center;">
+            Reset Filter
+          </a>
+          {% endif %}
+        </form>
+
+        <div class="fp-info">
+          <p><strong>💬 Butuh bantuan?</strong></p>
+          <p>Hubungi kami via WhatsApp untuk konsultasi.</p>
+          <a href="https://wa.me/6281234567890" target="_blank"
+             class="btn btn-wa" style="width:100%;margin-top:10px;text-align:center;">
+            Chat WA Sekarang
+          </a>
+        </div>
+      </aside>
+
+      <!-- Car Listing -->
+      <div class="cars-main">
+        <div class="cars-toolbar">
+          <p>Menampilkan <strong>{{ car_list|length }}</strong> armada
+            {% if category %} — <strong>{{ category.name }}</strong>{% endif %}
+          </p>
+        </div>
+
+        {% if car_list %}
+        <div class="car-grid">
+          {% for car in car_list %}
+          <div class="car-card reveal">
+            <div class="car-card-img">
+              <img src="{{ car_image_url(car) }}" alt="{{ car.name }}" loading="lazy"
+                   onerror="this.src='https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=600'">
+              <span class="car-badge car-badge-{{ car.category_slug }}">{{ car.category_name }}</span>
+            </div>
+            <div class="car-card-body">
+              <div class="car-meta">
+                <span class="car-brand">{{ car.brand }}</span>
+                {% if car.year %}<span class="car-year">{{ car.year }}</span>{% endif %}
+              </div>
+              <h3 class="car-name">{{ car.name }}</h3>
+              {% if car.description %}
+              <p class="car-desc">{{ car.description }}</p>
+              {% endif %}
+              <div class="car-specs">
+                <span class="spec">
+                  {% if car.transmission == 'Matic' %}⚙️{% else %}🔧{% endif %}
+                  {{ car.transmission }}
+                </span>
+                <span class="spec">👥 {{ car.capacity }} Kursi</span>
+              </div>
+              <div class="car-footer">
+                <div class="car-price-wrap">
+                  <small>Mulai dari</small>
+                  <div class="car-price">
+                    {{ car.price_per_day | currency }}<span>/hari</span>
+                  </div>
+                </div>
+                <a href="{{ url_for('booking', car_id=car.id) }}"
+                   class="btn btn-primary btn-sm">Pilih Mobil</a>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="empty-state">
+          <div>🔍</div>
+          <h3>Tidak ada mobil ditemukan</h3>
+          <p>Coba ubah filter atau <a href="{{ url_for('cars') }}">lihat semua armada</a>.</p>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</section>
+{% endblock %}

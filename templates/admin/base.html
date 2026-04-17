@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Admin — DriveEasy{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="admin-body">
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <span>🚘</span>
+    <span>Drive<strong>Easy</strong></span>
+    <span class="sidebar-badge">Admin</span>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('admin_dashboard') }}"
+       class="sidebar-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+      <span class="sicon">📊</span> Dashboard
+    </a>
+
+    <div class="sidebar-section">Armada</div>
+    <a href="{{ url_for('admin_cars') }}"
+       class="sidebar-link {% if 'car' in request.endpoint %}active{% endif %}">
+      <span class="sicon">🚗</span> Kelola Mobil
+    </a>
+
+    <div class="sidebar-section">Keuangan</div>
+    <a href="{{ url_for('admin_discounts') }}"
+       class="sidebar-link {% if 'discount' in request.endpoint %}active{% endif %}">
+      <span class="sicon">🏷️</span> Diskon & Promo
+    </a>
+
+    <div class="sidebar-section">Transaksi</div>
+    <a href="{{ url_for('admin_bookings') }}"
+       class="sidebar-link {% if 'booking' in request.endpoint %}active{% endif %}">
+      <span class="sicon">📋</span> Pemesanan
+    </a>
+
+    <div class="sidebar-section">Pelanggan</div>
+    <a href="{{ url_for('admin_reviews') }}"
+       class="sidebar-link {% if 'review' in request.endpoint %}active{% endif %}">
+      <span class="sicon">⭐</span> Ulasan
+    </a>
+
+    <div class="sidebar-divider"></div>
+    <a href="{{ url_for('index') }}" target="_blank" class="sidebar-link">
+      <span class="sicon">🌐</span> Lihat Website
+    </a>
+    <a href="{{ url_for('admin_logout') }}" class="sidebar-link sidebar-link-danger">
+      <span class="sicon">🚪</span> Logout
+    </a>
+  </nav>
+</aside>
+
+<!-- Main Content -->
+<div class="admin-main" id="adminMain">
+
+  <!-- Topbar -->
+  <header class="admin-topbar">
+    <button class="topbar-toggle" id="sidebarToggle">☰</button>
+    <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+    <div class="topbar-user">
+      <span class="topbar-avatar">👤</span>
+      <span>{{ admin_name }}</span>
+    </div>
+  </header>
+
+  <!-- Flash Messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div style="padding:16px 24px 0;">
+      {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }}">
+        <span>{{ msg }}</span>
+        <button onclick="this.parentElement.remove()">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Page Content -->
+  <div class="admin-content">
+    {% block content %}{% endblock %}
+  </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

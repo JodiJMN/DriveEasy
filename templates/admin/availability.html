@@ -1,0 +1,116 @@
+{% extends "admin/base.html" %}
+{% block title %}Jadwal {{ car.name }} — Admin DriveEasy{% endblock %}
+{% block page_title %}Jadwal Ketersediaan{% endblock %}
+
+{% block content %}
+
+<div class="asec-header" style="margin-bottom:20px">
+  <div>
+    <h2>📅 Jadwal — {{ car.brand }} {{ car.name }}</h2>
+    <p style="color:#64748b;margin-top:4px">Kelola tanggal blokir & ketersediaan unit ini</p>
+  </div>
+  <a href="{{ url_for('admin_cars') }}" class="btn btn-outline btn-sm">← Kembali ke Armada</a>
+</div>
+
+<div class="avail-layout">
+
+  <!-- Add Block Form -->
+  <div class="avail-form-card">
+    <h3>🔒 Blokir Tanggal</h3>
+    <form method="POST" action="{{ url_for('admin_availability_add', car_id=car.id) }}"
+          class="admin-form">
+      <div class="afg">
+        <label>Tanggal Mulai <span class="req">*</span></label>
+        <input type="date" name="block_start" class="afi" required
+               min="{{ today }}">
+      </div>
+      <div class="afg">
+        <label>Tanggal Selesai <span class="req">*</span></label>
+        <input type="date" name="block_end" class="afi" required
+               min="{{ today }}">
+      </div>
+      <div class="afg">
+        <label>Alasan</label>
+        <select name="reason" class="afi">
+          <option value="maintenance">🔧 Perawatan / Servis</option>
+          <option value="reserved">📌 Direservasi</option>
+          <option value="other">📝 Lainnya</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Blokir Tanggal</button>
+    </form>
+  </div>
+
+  <!-- Blocks List -->
+  <div class="avail-list">
+    <h3>Daftar Blokir Aktif</h3>
+    {% if blocks %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Mulai</th>
+            <th>Selesai</th>
+            <th>Alasan</th>
+            <th>Booking</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in blocks %}
+          <tr>
+            <td>{{ b.block_start }}</td>
+            <td>{{ b.block_end }}</td>
+            <td>
+              <span class="avail-reason avail-{{ b.reason }}">
+                {% if b.reason == 'booked' %}📋 Dipesan
+                {% elif b.reason == 'maintenance' %}🔧 Perawatan
+                {% elif b.reason == 'reserved' %}📌 Direservasi
+                {% else %}📝 {{ b.reason }}{% endif %}
+              </span>
+            </td>
+            <td>
+              {% if b.booking_id %}
+              <a href="{{ url_for('admin_bookings') }}" style="color:#0070e0">#{{ b.booking_id }}</a>
+              {% if b.customer_name %}<br><small>{{ b.customer_name }}</small>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if b.reason != 'booked' %}
+              <form method="POST" action="{{ url_for('admin_availability_delete', block_id=b.id) }}"
+                    onsubmit="return confirm('Hapus blokir ini?')">
+                <button type="submit" class="btn btn-danger btn-xs">🗑️ Hapus</button>
+              </form>
+              {% else %}
+              <span style="font-size:12px;color:#94a3b8">Terkait booking</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:40px">
+      <div>📅</div>
+      <p>Tidak ada blokir tanggal aktif untuk unit ini.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto set end_date min = start_date
+const startEl = document.querySelector('[name="block_start"]');
+const endEl   = document.querySelector('[name="block_end"]');
+if (startEl && endEl) {
+  startEl.addEventListener('change', () => { endEl.min = startEl.value; });
+}
+// today injection
+const today = new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}

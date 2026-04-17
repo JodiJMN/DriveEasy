@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Admin Login — DriveEasy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body class="login-body">
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-logo">🚘 Drive<strong>Easy</strong></div>
+    <h2>Admin Panel</h2>
+    <p>Masuk untuk mengelola armada & pemesanan</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}" style="margin-bottom:16px">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" class="login-form">
+      <div class="lfg">
+        <label>Username</label>
+        <input type="text" name="username" class="lfi" placeholder="admin" required autofocus>
+      </div>
+      <div class="lfg">
+        <label>Password</label>
+        <input type="password" name="password" class="lfi" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:8px">
+        Masuk ke Admin Panel
+      </button>
+    </form>
+
+    <a href="{{ url_for('index') }}" class="login-back">← Kembali ke Website</a>
+  </div>
+</div>
+</body>
+</html>

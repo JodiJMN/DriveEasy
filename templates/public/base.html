@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}DriveEasy — Sewa Mobil Mudah & Terpercaya{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/public.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- NAVBAR -->
+<header class="navbar" id="navbar">
+  <div class="container nav-inner">
+    <a href="{{ url_for('index') }}" class="nav-logo">
+      <span class="nav-logo-icon">🚘</span>
+      <span>Drive<strong>Easy</strong></span>
+    </a>
+    <nav class="nav-links" id="navLinks">
+      {% for cat in categories %}
+      <a href="{{ url_for('cars', slug=cat.slug) }}" class="nav-link">
+        Sewa {{ cat.name }}
+      </a>
+      {% endfor %}
+      <a href="#cara-kerja" class="nav-link">Cara Kerja</a>
+      <a href="{{ url_for('feedback') }}" class="nav-link">⭐ Beri Masukan</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="{{ url_for('cars') }}" class="btn btn-primary btn-sm">Cari Mobil</a>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Flash -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-stack" id="flashStack">
+    {% for cat, msg in messages %}
+    <div class="flash flash-{{ cat }}">
+      <span>{{ msg }}</span>
+      <button onclick="this.parentElement.remove()">✕</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main>{% block content %}{% endblock %}</main>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="footer-logo">🚘 Drive<strong>Easy</strong></div>
+        <p>Platform sewa mobil terpercaya untuk semua kebutuhan perjalananmu.</p>
+        <div class="footer-socials">
+          <a href="#" title="Facebook">📘</a>
+          <a href="#" title="Instagram">📸</a>
+          <a href="#" title="WhatsApp">💬</a>
+        </div>
+      </div>
+      <div>
+        <h4>Layanan</h4>
+        {% for cat in categories %}
+        <a href="{{ url_for('cars', slug=cat.slug) }}">Sewa {{ cat.name }}</a>
+        {% endfor %}
+        <a href="#">Sewa Jangka Panjang</a>
+      </div>
+      <div>
+        <h4>Perusahaan</h4>
+        <a href="#">Tentang Kami</a>
+        <a href="{{ url_for('feedback') }}">Beri Masukan</a>
+        <a href="#">Syarat & Ketentuan</a>
+        <a href="#">Kebijakan Privasi</a>
+      </div>
+      <div>
+        <h4>Kontak</h4>
+        <p>📞 +62 812-3456-7890</p>
+        <p>✉️ hello@driveeasy.id</p>
+        <p>📍 Jakarta, Indonesia</p>
+        <a href="https://wa.me/6281234567890" target="_blank"
+           class="btn btn-wa" style="margin-top:14px;display:inline-flex;">
+          💬 Chat WA Admin
+        </a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© {{ current_year }} DriveEasy. All rights reserved.</p>
+      <a href="{{ url_for('admin_login') }}" style="color:rgba(255,255,255,.3);font-size:12px;">Admin</a>
+    </div>
+  </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/public.js') }}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

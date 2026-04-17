@@ -1,0 +1,254 @@
+{% extends "public/base.html" %}
+{% block title %}Beri Masukan — DriveEasy{% endblock %}
+
+{% block extra_head %}
+<style>
+/* ── Feedback Page Styles ─────────────────────── */
+.feedback-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0ea5e9 100%);
+  padding: 80px 0 60px;
+  text-align: center;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.feedback-hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 70% 30%, rgba(14,165,233,.25) 0%, transparent 60%);
+}
+.feedback-hero-inner { position: relative; z-index: 1; }
+.feedback-hero h1 { font-size: clamp(1.8rem,4vw,2.8rem); font-weight: 800; margin: 0 0 12px; }
+.feedback-hero p  { font-size: 1.05rem; opacity: .85; max-width: 540px; margin: 0 auto; }
+.fh-badge {
+  display: inline-block; background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.25); backdrop-filter: blur(8px);
+  border-radius: 50px; padding: 6px 18px; font-size: .85rem;
+  margin-bottom: 18px; letter-spacing: .5px;
+}
+
+/* ── Form Card ────────────────────────────────── */
+.feedback-section { padding: 60px 0 80px; background: #f8fafc; }
+.feedback-card {
+  max-width: 680px; margin: 0 auto;
+  background: #fff; border-radius: 20px;
+  box-shadow: 0 4px 40px rgba(0,0,0,.08);
+  padding: 48px 48px 40px;
+}
+@media(max-width:640px){ .feedback-card{ padding:28px 20px 24px; } }
+
+.fb-form-group { margin-bottom: 22px; }
+.fb-form-group label {
+  display: block; font-weight: 600; font-size: .9rem;
+  color: #374151; margin-bottom: 8px;
+}
+.fb-form-group label span { color: #ef4444; }
+.fb-form-group input,
+.fb-form-group textarea {
+  width: 100%; padding: 12px 16px; border-radius: 10px;
+  border: 1.5px solid #e5e7eb; font-size: .95rem; font-family: inherit;
+  transition: border-color .2s;
+  box-sizing: border-box;
+}
+.fb-form-group input:focus,
+.fb-form-group textarea:focus {
+  outline: none; border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14,165,233,.12);
+}
+.fb-form-group textarea { resize: vertical; min-height: 130px; }
+
+/* ── Star Rating ──────────────────────────────── */
+.star-rating-wrap { margin-bottom: 6px; }
+.star-rating {
+  display: flex; flex-direction: row-reverse;
+  justify-content: flex-end; gap: 6px;
+}
+.star-rating input[type="radio"] { display: none; }
+.star-rating label {
+  font-size: 2.2rem; cursor: pointer; color: #d1d5db;
+  transition: color .15s, transform .15s;
+  line-height: 1; margin-bottom: 0;
+}
+.star-rating input:checked ~ label,
+.star-rating label:hover,
+.star-rating label:hover ~ label { color: #f59e0b; transform: scale(1.15); }
+.star-hint { font-size: .82rem; color: #9ca3af; margin-top: 6px; min-height: 20px; }
+
+/* ── Submit ───────────────────────────────────── */
+.fb-submit-row { margin-top: 28px; }
+.btn-fb-submit {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  color: #fff; font-size: 1rem; font-weight: 700;
+  padding: 14px 36px; border-radius: 12px; border: none; cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+  box-shadow: 0 4px 18px rgba(14,165,233,.35);
+}
+.btn-fb-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(14,165,233,.4); }
+.btn-fb-submit:active{ transform: translateY(0); }
+
+/* ── Reviews Preview ──────────────────────────── */
+.reviews-preview { padding: 0 0 70px; background: #f8fafc; }
+.reviews-preview .sec-header { text-align: center; margin-bottom: 36px; }
+.reviews-preview .sec-header h2 { font-size: 1.7rem; font-weight: 800; color: #1e293b; margin: 0 0 8px; }
+.reviews-preview .sec-header p  { color: #64748b; font-size: .95rem; }
+.rp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px,1fr));
+  gap: 20px;
+}
+.rp-card {
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(0,0,0,.06);
+  padding: 24px; position: relative;
+  border: 1px solid #f1f5f9;
+  transition: box-shadow .2s, transform .2s;
+}
+.rp-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,.1); transform: translateY(-3px); }
+.rp-stars { color: #f59e0b; font-size: 1rem; margin-bottom: 10px; letter-spacing: 2px; }
+.rp-msg { color: #334155; font-size: .92rem; line-height: 1.65; margin-bottom: 14px; }
+.rp-meta { display: flex; align-items: center; gap: 10px; }
+.rp-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: linear-gradient(135deg, #0ea5e9, #2563eb);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: .95rem; flex-shrink: 0;
+}
+.rp-name { font-weight: 600; font-size: .88rem; color: #1e293b; }
+.rp-date { font-size: .78rem; color: #94a3b8; }
+.rp-quote {
+  position: absolute; top: 18px; right: 20px;
+  font-size: 2.5rem; color: #e2e8f0; line-height: 1; font-family: Georgia,serif;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── HERO ──────────────────────────────────────── -->
+<section class="feedback-hero">
+  <div class="container feedback-hero-inner">
+    <div class="fh-badge">⭐ Bantu Kami Berkembang</div>
+    <h1>Beri Masukan untuk DriveEasy</h1>
+    <p>Kritik, saran, dan pengalaman Anda sangat berarti bagi kami untuk terus meningkatkan layanan.</p>
+  </div>
+</section>
+
+<!-- ── FORM ───────────────────────────────────────── -->
+<section class="feedback-section">
+  <div class="container">
+    <div class="feedback-card">
+      <h2 style="font-size:1.4rem;font-weight:800;color:#1e293b;margin:0 0 6px;">Formulir Masukan</h2>
+      <p style="color:#64748b;font-size:.9rem;margin:0 0 32px;">Semua field bertanda <span style="color:#ef4444">*</span> wajib diisi.</p>
+
+      <form method="POST" action="{{ url_for('feedback') }}" id="feedbackForm">
+
+        <!-- Nama -->
+        <div class="fb-form-group">
+          <label for="name">Nama Lengkap <span>*</span></label>
+          <input type="text" id="name" name="name" placeholder="Masukkan nama Anda"
+                 value="{{ form_data.get('name', '') }}" required maxlength="100">
+        </div>
+
+        <!-- Email (opsional) -->
+        <div class="fb-form-group">
+          <label for="email">Email <small style="font-weight:400;color:#9ca3af;">(opsional)</small></label>
+          <input type="email" id="email" name="email" placeholder="email@contoh.com"
+                 value="{{ form_data.get('email', '') }}" maxlength="150">
+        </div>
+
+        <!-- Rating Bintang -->
+        <div class="fb-form-group">
+          <label>Rating Layanan <span>*</span></label>
+          <div class="star-rating-wrap">
+            <div class="star-rating" role="radiogroup" aria-label="Rating bintang">
+              {% for i in [5,4,3,2,1] %}
+              <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}"
+                {% if form_data.get('rating')|string == i|string %}checked{% endif %}>
+              <label for="star{{ i }}" title="{{ i }} bintang">★</label>
+              {% endfor %}
+            </div>
+            <div class="star-hint" id="starHint">Klik bintang untuk memberi rating</div>
+          </div>
+        </div>
+
+        <!-- Pesan -->
+        <div class="fb-form-group">
+          <label for="message">Kritik &amp; Saran <span>*</span></label>
+          <textarea id="message" name="message" placeholder="Ceritakan pengalaman atau saran Anda untuk DriveEasy…" required minlength="10" maxlength="2000">{{ form_data.get('message', '') }}</textarea>
+          <small style="color:#9ca3af;font-size:.8rem;">Minimal 10 karakter. Maksimal 2000 karakter.</small>
+        </div>
+
+        <div class="fb-submit-row">
+          <button type="submit" class="btn-fb-submit">
+            <span>📨</span> Kirim Masukan
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ── ULASAN TERBARU ─────────────────────────────── -->
+{% if approved_reviews %}
+<section class="reviews-preview">
+  <div class="container">
+    <div class="sec-header">
+      <h2>Apa Kata Pelanggan Kami?</h2>
+      <p>Ulasan nyata dari pelanggan yang telah menggunakan layanan DriveEasy</p>
+    </div>
+    <div class="rp-grid">
+      {% for rv in approved_reviews %}
+      <div class="rp-card">
+        <div class="rp-quote">"</div>
+        <div class="rp-stars">
+          {% for i in range(rv.rating) %}★{% endfor %}{% for i in range(5 - rv.rating) %}☆{% endfor %}
+        </div>
+        <p class="rp-msg">{{ rv.message|truncate(160) }}</p>
+        <div class="rp-meta">
+          <div class="rp-avatar">{{ rv.name[0]|upper }}</div>
+          <div>
+            <div class="rp-name">{{ rv.name }}</div>
+            <div class="rp-date">{{ rv.created_at.strftime('%d %b %Y') if rv.created_at else '' }}</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const hints = {
+    1: '😞 Sangat Buruk — Perlu banyak perbaikan',
+    2: '😕 Buruk — Di bawah ekspektasi',
+    3: '😐 Cukup — Bisa lebih baik',
+    4: '😊 Baik — Puas dengan layanan',
+    5: '🤩 Luar Biasa — Sangat memuaskan!'
+  };
+  const hintEl = document.getElementById('starHint');
+  document.querySelectorAll('.star-rating input').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      hintEl.textContent = hints[this.value] || '';
+    });
+    // Isi hint jika sudah ada nilai (form re-submit)
+    if(inp.checked){ hintEl.textContent = hints[inp.value] || ''; }
+  });
+
+  // Validasi rating sebelum submit
+  document.getElementById('feedbackForm').addEventListener('submit', function(e){
+    const rated = document.querySelector('.star-rating input:checked');
+    if(!rated){
+      e.preventDefault();
+      hintEl.textContent = '⚠️ Pilih rating bintang terlebih dahulu!';
+      hintEl.style.color = '#ef4444';
+    }
+  });
+})();
+</script>
+{% endblock %}

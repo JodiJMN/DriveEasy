@@ -1,0 +1,181 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Edit' if car else 'Tambah' }} Mobil — Admin DriveEasy{% endblock %}
+{% block page_title %}{{ 'Edit Mobil' if car else 'Tambah Mobil Baru' }}{% endblock %}
+
+{% block content %}
+
+<div class="form-page-wrap">
+  <div class="form-card">
+    <div class="form-card-header">
+      <h2>{{ '✏️ Edit Data Mobil' if car else '➕ Tambah Mobil Baru' }}</h2>
+      <a href="{{ url_for('admin_cars') }}" class="btn btn-outline btn-sm">← Kembali</a>
+    </div>
+
+    <form method="POST"
+          action="{{ url_for('admin_car_edit', car_id=car.id) if car else url_for('admin_car_add') }}"
+          enctype="multipart/form-data" class="admin-form">
+
+      <div class="form-two-col">
+        <div class="form-col">
+
+          <!-- Nama & Brand -->
+          <div class="afg">
+            <label>Nama Mobil <span class="req">*</span></label>
+            <input type="text" name="name" class="afi" required
+                   value="{{ car.name if car else '' }}" placeholder="e.g. Avanza G">
+          </div>
+          <div class="afg">
+            <label>Brand / Merk <span class="req">*</span></label>
+            <input type="text" name="brand" class="afi" required
+                   value="{{ car.brand if car else '' }}" placeholder="e.g. Toyota">
+          </div>
+
+          <!-- Kategori -->
+          <div class="afg">
+            <label>Kategori <span class="req">*</span></label>
+            <select name="category_id" class="afi" required>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}"
+                      {% if car and car.category_id == cat.id %}selected{% endif %}>
+                {{ cat.icon }} {{ cat.name }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <!-- Harga -->
+          <div class="afg">
+            <label>Harga per Hari (Rp) <span class="req">*</span></label>
+            <input type="number" name="price_per_day" class="afi" required
+                   min="0" step="1000"
+                   value="{{ car.price_per_day|int if car else '' }}"
+                   placeholder="350000">
+          </div>
+
+          <!-- Transmisi & Kapasitas -->
+          <div class="afg-row">
+            <div class="afg">
+              <label>Transmisi <span class="req">*</span></label>
+              <select name="transmission" class="afi" required>
+                <option value="Matic"  {% if car and car.transmission == 'Matic'  %}selected{% endif %}>Matic</option>
+                <option value="Manual" {% if car and car.transmission == 'Manual' %}selected{% endif %}>Manual</option>
+              </select>
+            </div>
+            <div class="afg">
+              <label>Kapasitas (kursi) <span class="req">*</span></label>
+              <input type="number" name="capacity" class="afi" required
+                     min="2" max="20"
+                     value="{{ car.capacity if car else '' }}" placeholder="7">
+            </div>
+          </div>
+
+          <!-- Tahun & Warna -->
+          <div class="afg-row">
+            <div class="afg">
+              <label>Tahun</label>
+              <input type="number" name="year" class="afi"
+                     min="2000" max="2030"
+                     value="{{ car.year if car else '' }}" placeholder="2023">
+            </div>
+            <div class="afg">
+              <label>Warna</label>
+              <input type="text" name="color" class="afi"
+                     value="{{ car.color if car else '' }}" placeholder="Putih">
+            </div>
+          </div>
+
+          <!-- Plat Nomor -->
+          <div class="afg">
+            <label>Plat Nomor</label>
+            <input type="text" name="license_plate" class="afi"
+                   value="{{ car.license_plate if car else '' }}" placeholder="B 1234 XYZ">
+          </div>
+
+          <!-- Urutan & Status -->
+          <div class="afg-row">
+            <div class="afg">
+              <label>Urutan Tampil</label>
+              <input type="number" name="sort_order" class="afi" min="0"
+                     value="{{ car.sort_order if car else 0 }}">
+            </div>
+            <div class="afg">
+              <label>&nbsp;</label>
+              <label class="toggle-label">
+                <input type="checkbox" name="is_available"
+                       {% if not car or car.is_available %}checked{% endif %}>
+                <span>Tersedia untuk disewa</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="form-col">
+
+          <!-- Foto Mobil -->
+          <div class="afg">
+            <label>Foto Mobil</label>
+            <div class="img-upload-wrap">
+              {% if car and car.image_filename %}
+              <div class="img-preview-current">
+                <img src="{{ car_image_url(car) }}" alt="Foto saat ini" id="imgPreview">
+                <small>Foto saat ini — upload foto baru untuk mengganti</small>
+              </div>
+              {% else %}
+              <div class="img-preview-current" id="imgPreviewWrap" style="display:none">
+                <img src="" alt="Preview" id="imgPreview">
+              </div>
+              {% endif %}
+              <div class="img-upload-zone" id="imgZone">
+                <input type="file" name="image_file" id="imgFile"
+                       accept=".jpg,.jpeg,.png,.webp" class="upload-input">
+                <div class="img-upload-ph" id="imgPh">
+                  <span style="font-size:32px">📷</span>
+                  <strong>Klik atau seret foto</strong>
+                  <small>JPG, PNG, WEBP — Maks. 5 MB</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Deskripsi -->
+          <div class="afg">
+            <label>Deskripsi</label>
+            <textarea name="description" class="afi afi-ta" rows="4"
+                      placeholder="Deskripsi singkat tentang mobil ini...">{{ car.description if car else '' }}</textarea>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <a href="{{ url_for('admin_cars') }}" class="btn btn-outline">Batal</a>
+        <button type="submit" class="btn btn-primary">
+          {{ '💾 Simpan Perubahan' if car else '➕ Tambah Mobil' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Image preview on upload
+const imgFile = document.getElementById('imgFile');
+const imgPrev = document.getElementById('imgPreview');
+const imgWrap = document.getElementById('imgPreviewWrap');
+const imgZone = document.getElementById('imgZone');
+
+imgZone.addEventListener('click', () => imgFile.click());
+imgFile.addEventListener('change', function() {
+  if (this.files[0]) {
+    const url = URL.createObjectURL(this.files[0]);
+    if (imgPrev) { imgPrev.src = url; }
+    if (imgWrap) { imgWrap.style.display = 'block'; }
+    document.getElementById('imgPh').style.display = 'none';
+  }
+});
+</script>
+{% endblock %}
