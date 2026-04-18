@@ -1,0 +1,9 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+car_rental.db
+static/uploads/ktp/
+*.db-shm
+*.db-wal
+CarRentalDB.sql

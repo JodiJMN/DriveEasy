@@ -1,6 +1,7 @@
 """
 DriveEasy — Flask Backend v2  (app.py)
 ======================================
+Database  : SQLite  (car_rental.db) — siap deploy di PythonAnywhere
 Struktur Route:
   Public  : /, /cars, /cars/<slug>, /booking/<id>, /booking/success
              /feedback
@@ -14,7 +15,7 @@ Struktur Route:
             /admin/reviews  (list, toggle approve, delete)
 """
 
-import os, uuid, json
+import os, uuid, json, sqlite3, re
 from datetime import datetime, date
 from functools import wraps
 from dotenv import load_dotenv
@@ -24,19 +25,19 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-import pyodbc
 
 load_dotenv()
+
 # ─────────────────────────────────────────────────────
 # App & Config
 # ─────────────────────────────────────────────────────
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY')
+app.secret_key = os.environ.get('SECRET_KEY', 'change-me-in-production!')
 
-# Folder paths
 BASE_DIR      = app.root_path
 UPLOAD_KTP    = os.path.join(BASE_DIR, 'static', 'uploads', 'ktp')
 UPLOAD_CARS   = os.path.join(BASE_DIR, 'static', 'img', 'cars')
+DB_PATH       = os.path.join(BASE_DIR, 'car_rental.db')
 ALLOWED_IMG   = {'png', 'jpg', 'jpeg', 'webp', 'jfif'}
 ALLOWED_DOCS  = {'png', 'jpg', 'jpeg', 'pdf'}
 MAX_UPLOAD_MB = 5
@@ -47,52 +48,179 @@ for d in [UPLOAD_KTP, UPLOAD_CARS]:
     os.makedirs(d, exist_ok=True)
 
 # ─────────────────────────────────────────────────────
-# Database
+# Database — SQLite
 # ─────────────────────────────────────────────────────
-DB = {
-    'server':   os.environ.get('DB_SERVER'),
-    'database': os.environ.get('DB_NAME'),
-    'username': os.environ.get('DB_USER'),
-    'password': os.environ.get('DB_PASSWORD'),
-    'driver':   os.environ.get('DB_DRIVER'),
-}
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS AdminUsers (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,
+    full_name     TEXT,
+    role          TEXT    NOT NULL DEFAULT 'admin'
+                          CHECK(role IN ('admin','superadmin')),
+    is_active     INTEGER NOT NULL DEFAULT 1,
+    last_login    TEXT,
+    created_at    TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS Categories (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    slug        TEXT    NOT NULL UNIQUE,
+    description TEXT,
+    icon        TEXT,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS Cars (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id    INTEGER NOT NULL REFERENCES Categories(id),
+    name           TEXT    NOT NULL,
+    brand          TEXT    NOT NULL,
+    price_per_day  REAL    NOT NULL,
+    transmission   TEXT    NOT NULL CHECK(transmission IN ('Manual','Matic')),
+    capacity       INTEGER NOT NULL,
+    image_filename TEXT,
+    description    TEXT,
+    features       TEXT,
+    is_available   INTEGER NOT NULL DEFAULT 1,
+    year           INTEGER,
+    license_plate  TEXT,
+    color          TEXT,
+    sort_order     INTEGER NOT NULL DEFAULT 0,
+    created_at     TEXT    DEFAULT (datetime('now')),
+    updated_at     TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS CarAvailability (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    car_id      INTEGER NOT NULL REFERENCES Cars(id) ON DELETE CASCADE,
+    block_start TEXT    NOT NULL,
+    block_end   TEXT    NOT NULL,
+    reason      TEXT,
+    booking_id  INTEGER,
+    created_at  TEXT    DEFAULT (datetime('now')),
+    CHECK(block_end >= block_start)
+);
+
+CREATE TABLE IF NOT EXISTS Discounts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    code           TEXT    UNIQUE,
+    name           TEXT    NOT NULL,
+    description    TEXT,
+    discount_type  TEXT    NOT NULL CHECK(discount_type IN ('percent','fixed')),
+    discount_value REAL    NOT NULL,
+    min_days       INTEGER NOT NULL DEFAULT 1,
+    max_uses       INTEGER,
+    used_count     INTEGER NOT NULL DEFAULT 0,
+    valid_from     TEXT    NOT NULL,
+    valid_until    TEXT    NOT NULL,
+    apply_to       TEXT    NOT NULL DEFAULT 'all'
+                           CHECK(apply_to IN ('all','personal','corporate')),
+    is_active      INTEGER NOT NULL DEFAULT 1,
+    created_at     TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS Bookings (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    car_id          INTEGER NOT NULL REFERENCES Cars(id),
+    discount_id     INTEGER REFERENCES Discounts(id),
+    customer_name   TEXT    NOT NULL,
+    phone_number    TEXT,
+    start_date      TEXT    NOT NULL,
+    end_date        TEXT    NOT NULL,
+    base_price      REAL,
+    discount_amount REAL    NOT NULL DEFAULT 0,
+    total_price     REAL,
+    ktp_filename    TEXT,
+    status          TEXT    NOT NULL DEFAULT 'pending'
+                            CHECK(status IN ('pending','confirmed','completed','cancelled')),
+    notes           TEXT,
+    admin_notes     TEXT,
+    created_at      TEXT    DEFAULT (datetime('now')),
+    updated_at      TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS Reviews (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    email       TEXT,
+    rating      INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+    message     TEXT    NOT NULL,
+    is_approved INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS IX_Cars_Category    ON Cars(category_id);
+CREATE INDEX IF NOT EXISTS IX_Cars_Available   ON Cars(is_available);
+CREATE INDEX IF NOT EXISTS IX_Bookings_Car     ON Bookings(car_id);
+CREATE INDEX IF NOT EXISTS IX_Bookings_Status  ON Bookings(status);
+CREATE INDEX IF NOT EXISTS IX_Availability_Car ON CarAvailability(car_id);
+"""
+
+
+# ─────────────────────────────────────────────────────
+# SQLite date/datetime auto-converter
+# ─────────────────────────────────────────────────────
+_ISO_DT_RE   = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+_ISO_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
+_DT_FMTS     = ['%Y-%m-%dT%H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S']
+
+def _parse_val(val):
+    """Konversi ISO string → Python date/datetime agar template bisa .strftime()."""
+    if not isinstance(val, str) or not val:
+        return val
+    if _ISO_DT_RE.match(val):
+        for fmt in _DT_FMTS:
+            try:
+                return datetime.strptime(val, fmt)
+            except ValueError:
+                continue
+    elif _ISO_DATE_RE.match(val):
+        try:
+            return datetime.strptime(val, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    return val
+
+def _process_row(row: dict) -> dict:
+    """Jalankan _parse_val pada setiap value dalam row."""
+    return {k: _parse_val(v) for k, v in row.items()}
+
 
 def get_db():
-    conn_str = (
-        f"DRIVER={DB['driver']};"
-        f"SERVER={DB['server']};"
-        f"DATABASE={DB['database']};"
-        f"UID={DB['username']};"
-        f"PWD={DB['password']};"
-        "TrustServerCertificate=yes;"
-    )
-    return pyodbc.connect(conn_str)
+    """Buka koneksi SQLite baru per-request."""
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    return conn
+
 
 def qdb(sql, params=(), one=False):
-    """SELECT helper — returns list[dict] or dict."""
+    """SELECT helper — returns list[dict] or dict.
+    
+    Semua kolom bertipe ISO date/datetime string otomatis dikonversi ke
+    Python date/datetime object, sehingga template bisa memanggil .strftime()
+    persis seperti saat menggunakan pyodbc/SQL Server.
+    """
     conn = get_db()
     try:
-        cur = conn.cursor()
-        cur.execute(sql, params)
-        cols = [c[0] for c in cur.description]
-        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        cur  = conn.execute(sql, params)
+        rows = [_process_row(dict(r)) for r in cur.fetchall()]
         return rows[0] if (one and rows) else (None if one else rows)
     finally:
         conn.close()
+
 
 def xdb(sql, params=()):
     """INSERT/UPDATE/DELETE helper — returns last inserted id."""
     conn = get_db()
     try:
-        cur = conn.cursor()
-        cur.execute(sql, params)
-        last_id = None
-        try:
-            cur.execute("SELECT SCOPE_IDENTITY()")
-            r = cur.fetchone()
-            if r and r[0]: last_id = int(r[0])
-        except Exception:
-            pass
+        cur = conn.execute(sql, params)
+        last_id = cur.lastrowid
         conn.commit()
         return last_id
     except Exception as e:
@@ -101,40 +229,106 @@ def xdb(sql, params=()):
     finally:
         conn.close()
 
+
 # ─────────────────────────────────────────────────────
-# Database Initializer — jalankan otomatis saat app start
+# Database Initializer — otomatis saat app start
 # ─────────────────────────────────────────────────────
+def _seed_data(conn):
+    """Isi data awal: Categories, Cars, Discounts, Reviews, Admin."""
+    now = datetime.now().isoformat()
+
+    # Categories
+    conn.executemany(
+        """INSERT OR IGNORE INTO Categories
+           (id, name, slug, description, icon, sort_order, is_active, created_at)
+           VALUES (?,?,?,?,?,?,?,?)""",
+        [
+            (1, 'Personal',  'personal',  'Sewa mobil untuk kebutuhan pribadi & keluarga',  '🚗', 1, 1, now),
+            (2, 'Corporate', 'corporate', 'Armada bisnis untuk perusahaan & event korporat', '🏢', 2, 1, now),
+        ]
+    )
+
+    # Cars — image_filename disesuaikan dengan file nyata di static/img/cars/
+    conn.executemany(
+        """INSERT OR IGNORE INTO Cars
+           (id, category_id, name, brand, price_per_day, transmission, capacity,
+            image_filename, description, is_available, year, color,
+            sort_order, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        [
+            # ── Personal ──────────────────────────────────────────────────────────
+            (1,  1, 'Avanza G',      'Toyota',     350000, 'Matic',  7, 'avanza_g.jfif',     'MPV keluarga andalan dengan kabin lega',           1, 2022, 'Silver',  1, now, now),
+            (2,  1, 'Brio Satya',    'Honda',       300000, 'Matic',  5, 'brio_satya.jfif',   'Hatchback kompak irit bahan bakar',                1, 2023, 'Merah',   2, now, now),
+            (3,  1, 'Xpander',       'Mitsubishi',  450000, 'Matic',  7, 'xpander.jfif',      'MPV stylish dengan fitur modern',                  1, 2023, 'Putih',   3, now, now),
+            (4,  1, 'BR-V',          'Honda',       500000, 'Matic',  7, 'br-v.jfif',         'SUV kompak stylish dengan fitur lengkap',          1, 2022, 'Hitam',   4, now, now),
+            (5,  1, 'Calya',         'Daihatsu',    280000, 'Manual', 7, 'calya.jfif',        'LCGC terjangkau untuk keluarga muda',              1, 2022, 'Biru',    5, now, now),
+            (6,  1, 'Ertiga',        'Suzuki',      400000, 'Matic',  7, 'ertiga.jfif',       'MPV elegan dengan kabin senyap',                   1, 2023, 'Abu-abu', 6, now, now),
+            # ── Corporate ─────────────────────────────────────────────────────────
+            (7,  2, 'Alphard',       'Toyota',     2500000, 'Matic',  7, 'alphard.jfif',      'Luxury MPV premium untuk eksekutif',               1, 2023, 'Putih',   1, now, now),
+            (8,  2, 'Fortuner PRZ',  'Toyota',     1200000, 'Matic',  7, 'fortuner_prz.jfif', 'SUV tangguh prestisius untuk perjalanan bisnis',   1, 2023, 'Hitam',   2, now, now),
+            (9,  2, 'Innova Reborn', 'Toyota',      750000, 'Matic',  7, 'innova_reborn.jfif','MPV andalan korporat yang nyaman',                 1, 2022, 'Silver',  3, now, now),
+            (10, 2, 'CRV Turbo',     'Honda',       900000, 'Matic',  5, 'crv_turbo.jfif',    'SUV premium bertorsi tinggi',                      1, 2023, 'Putih',   4, now, now),
+            (11, 2, 'Pajero Sport',  'Mitsubishi', 1500000, 'Matic',  7, 'pajero_sport.jfif', 'SUV gagah untuk medan apapun',                     1, 2023, 'Hitam',   5, now, now),
+            (12, 2, 'Hiace Premio',  'Toyota',     1000000, 'Manual', 15,'hiace_premio.jfif', 'Minibus kapasitas besar untuk grup & shuttle',     1, 2022, 'Putih',   6, now, now),
+        ]
+    )
+
+    # Discounts
+    conn.executemany(
+        """INSERT OR IGNORE INTO Discounts
+           (id, code, name, description, discount_type, discount_value, min_days,
+            max_uses, used_count, valid_from, valid_until, apply_to, is_active, created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        [
+            (1, 'HEMAT10', 'Diskon 10% Semua Kategori', 'Masukkan kode untuk hemat 10%',     'percent', 10.0,   2, None, 0, '2024-01-01', '2026-12-31', 'all',      1, now),
+            (2, 'CORP20',  'Promo Korporat 20%',        'Khusus sewa korporat min. 3 hari',  'percent', 20.0,   3, None, 0, '2024-01-01', '2026-12-31', 'corporate', 1, now),
+            (3, 'WEEKDAY', 'Cashback Rp 50.000',        'Sewa weekday hemat flat',            'fixed',  50000.0, 1, None, 0, '2024-01-01', '2026-12-31', 'all',      1, now),
+        ]
+    )
+
+    # Reviews
+    conn.executemany(
+        """INSERT OR IGNORE INTO Reviews
+           (id, name, email, rating, message, is_approved, created_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        [
+            (1, 'Jodi Ganteng',  'jodiganteng@gmail.com',  5, 'Sudah bagus', 1, now),
+            (2, 'Jodi Keren',    'jodikeren@gmail.com',    4, 'Fitur dan mobil yang ditawarkan cukup beragam, hanya untuk pembayaran masih perlu konfirmasi whatsapp', 1, now),
+            (3, 'Adiya Ganteng', 'adiyaganteng@gmail.com', 5, 'Fitur keren harga murah', 1, now),
+        ]
+    )
+
+    # Admin user — password dari env var;  WAJIB diganti setelah deploy!
+    admin_pass = os.environ.get('ADMIN_PASSWORD', 'Admin@DriveEasy2024')
+    conn.execute(
+        """INSERT OR IGNORE INTO AdminUsers
+           (id, username, password_hash, full_name, role, is_active, created_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        (1, 'admin', generate_password_hash(admin_pass), 'Administrator', 'superadmin', 1, now)
+    )
+
+
 def init_db():
-    """Buat tabel-tabel yang dibutuhkan jika belum ada."""
-    ddl_reviews = """
-        IF NOT EXISTS (
-            SELECT 1 FROM sys.tables WHERE name = 'Reviews'
-        )
-        BEGIN
-            CREATE TABLE Reviews (
-                id          INT IDENTITY(1,1) PRIMARY KEY,
-                name        NVARCHAR(100)  NOT NULL,
-                email       NVARCHAR(150)  NULL,
-                rating      TINYINT        NOT NULL CHECK (rating BETWEEN 1 AND 5),
-                message     NVARCHAR(2000) NOT NULL,
-                is_approved BIT            NOT NULL DEFAULT 1,
-                created_at  DATETIME       NOT NULL DEFAULT GETDATE()
-            );
-        END
-    """
+    """Buat semua tabel dan seed data awal bila DB belum terisi."""
     conn = get_db()
     try:
-        cur = conn.cursor()
-        cur.execute(ddl_reviews)
-        conn.commit()
-        app.logger.info("init_db: tabel Reviews siap.")
+        # executescript selalu commit sebelum jalan — aman untuk DDL
+        conn.executescript(_SCHEMA)
+        # Seed hanya jika Categories masih kosong
+        if conn.execute("SELECT COUNT(*) FROM Categories").fetchone()[0] == 0:
+            _seed_data(conn)
+            conn.commit()
+            app.logger.info("init_db: Data awal berhasil di-seed.")
+        else:
+            app.logger.info("init_db: Database sudah ada, skip seeding.")
     except Exception as e:
         app.logger.error(f"init_db error: {e}")
         conn.rollback()
     finally:
         conn.close()
 
-# Panggil init_db saat aplikasi pertama kali start
+
+# Jalankan init_db saat aplikasi pertama kali start
 with app.app_context():
     try:
         init_db()
@@ -147,8 +341,9 @@ with app.app_context():
 def allowed_ext(filename, allowed):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed
 
+
 def save_upload(file, folder, allowed):
-    """Save werkzeug FileStorage to folder. Returns new filename or None."""
+    """Simpan werkzeug FileStorage ke folder. Returns filename baru atau None."""
     if not file or file.filename == '':
         return None
     if not allowed_ext(file.filename, allowed):
@@ -158,6 +353,7 @@ def save_upload(file, folder, allowed):
     file.save(os.path.join(folder, name))
     return name
 
+
 def fmt_currency(v):
     """Jinja2 filter: format angka ke Rp."""
     try:
@@ -165,31 +361,36 @@ def fmt_currency(v):
     except Exception:
         return "Rp 0"
 
+
 app.jinja_env.filters['currency'] = fmt_currency
 
+
 def car_image_url(car):
-    """Return accessible URL untuk foto mobil."""
+    """Return URL yang bisa diakses untuk foto mobil."""
     fn = car.get('image_filename') if isinstance(car, dict) else getattr(car, 'image_filename', None)
     if not fn:
         return "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=600"
-    # Jika URL eksternal, langsung return
+    # URL eksternal — langsung return
     if fn.startswith('http'):
         return fn
+    # Cek file lokal di static/img/cars/
     local = os.path.join(UPLOAD_CARS, fn)
     if os.path.exists(local):
         return url_for('static', filename=f'img/cars/{fn}')
-    # Fallback ke gambar Unsplash per brand
-    fallbacks = {
-        'toyota': 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600',
-        'honda':  'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=600',
-        'mitsubishi': 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=600',
-        'daihatsu': 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=600',
-        'suzuki': 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=600',
-    }
+    # Fallback per brand
     brand = (car.get('brand') or '').lower()
+    fallbacks = {
+        'toyota':    'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=600',
+        'honda':     'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=600',
+        'mitsubishi':'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=600',
+        'daihatsu':  'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=600',
+        'suzuki':    'https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=600',
+    }
     return fallbacks.get(brand, "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=600")
 
+
 app.jinja_env.globals['car_image_url'] = car_image_url
+
 
 # ─────────────────────────────────────────────────────
 # Context processor — data global semua template
@@ -202,10 +403,11 @@ def inject_globals():
         cats = []
     try:
         approved_reviews = qdb("""
-            SELECT TOP 6 id, name, rating, message, created_at
+            SELECT id, name, rating, message, created_at
             FROM Reviews
             WHERE is_approved=1
             ORDER BY created_at DESC
+            LIMIT 6
         """)
     except Exception:
         approved_reviews = []
@@ -216,6 +418,7 @@ def inject_globals():
         admin_name=session.get('admin_name', ''),
         approved_reviews=approved_reviews,
     )
+
 
 # ─────────────────────────────────────────────────────
 # Admin Auth Guard
@@ -229,6 +432,7 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
 # ═════════════════════════════════════════════════════
 # PUBLIC ROUTES
 # ═════════════════════════════════════════════════════
@@ -237,29 +441,32 @@ def admin_required(f):
 def index():
     try:
         featured = qdb("""
-            SELECT TOP 6
+            SELECT
                 c.id, c.name, c.brand, c.price_per_day,
                 c.transmission, c.capacity, c.image_filename,
                 cat.name AS category_name, cat.slug AS category_slug
             FROM Cars c JOIN Categories cat ON c.category_id=cat.id
             WHERE c.is_available=1 AND cat.is_active=1
             ORDER BY c.price_per_day DESC
+            LIMIT 6
         """)
         stats = qdb("""
             SELECT
-                (SELECT COUNT(*) FROM Cars WHERE is_available=1)    AS total_cars,
-                (SELECT COUNT(*) FROM Bookings WHERE status='completed') AS total_bookings
+                (SELECT COUNT(*) FROM Cars WHERE is_available=1)          AS total_cars,
+                (SELECT COUNT(*) FROM Bookings WHERE status='completed')  AS total_bookings
         """, one=True)
-        # Active discounts untuk banner
+        # Diskon aktif untuk banner
         promos = qdb("""
-            SELECT TOP 3 * FROM Discounts
-            WHERE is_active=1 AND valid_from<=CAST(GETDATE() AS DATE)
-                  AND valid_until>=CAST(GETDATE() AS DATE)
+            SELECT * FROM Discounts
+            WHERE is_active=1
+              AND valid_from  <= date('now')
+              AND valid_until >= date('now')
             ORDER BY discount_value DESC
+            LIMIT 3
         """)
     except Exception as e:
         app.logger.error(f"index DB error: {e}")
-        featured, stats, promos = [], {'total_cars':0,'total_bookings':0}, []
+        featured, stats, promos = [], {'total_cars': 0, 'total_bookings': 0}, []
     return render_template('public/index.html',
                            featured_cars=featured, stats=stats, promos=promos)
 
@@ -294,7 +501,7 @@ def cars(slug=None):
         try:
             sql += " AND c.capacity>=?"; params.append(int(cap))
         except (ValueError, TypeError):
-            pass  # abaikan param capacity yang tidak valid
+            pass
     sql += " ORDER BY c.sort_order, c.price_per_day ASC"
 
     try:
@@ -320,18 +527,18 @@ def booking(car_id):
         flash('Mobil tidak tersedia.', 'error')
         return redirect(url_for('index'))
 
-    # Ambil tanggal yang sudah diblokir untuk kalender
+    # Tanggal yang sudah diblokir untuk kalender
     blocked = qdb("""
         SELECT block_start, block_end FROM CarAvailability
-        WHERE car_id=? AND block_end >= CAST(GETDATE() AS DATE)
+        WHERE car_id=? AND block_end >= date('now')
     """, (car_id,))
     blocked_ranges = [
         {"from": str(b['block_start']), "to": str(b['block_end'])}
         for b in blocked
     ]
 
-    # Ambil diskon aktif
-    today = date.today().isoformat()
+    # Diskon aktif
+    today    = date.today().isoformat()
     cat_slug = car.get('category_slug', '')
     discounts = qdb("""
         SELECT * FROM Discounts
@@ -387,9 +594,8 @@ def booking(car_id):
                                    discounts=discounts, form_data=request.form)
 
         # Hitung harga
-        base_price = total_days * float(car['price_per_day'])
+        base_price  = total_days * float(car['price_per_day'])
         disc_amount = 0.0
-        disc_obj = None
         if disc_id:
             disc_obj = qdb("SELECT * FROM Discounts WHERE id=? AND is_active=1",
                            (disc_id,), one=True)
@@ -408,11 +614,11 @@ def booking(car_id):
                      start_date, end_date, base_price, discount_amount,
                      total_price, ktp_filename, notes)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            """, (car_id, disc_id or None, name, phone,
+            """, (car_id, disc_id, name, phone,
                   sd, ed, base_price, disc_amount,
                   total_price, ktp_fn, notes))
 
-            # Blokir tanggal di CarAvailability
+            # Blokir tanggal
             xdb("""
                 INSERT INTO CarAvailability (car_id, block_start, block_end, reason, booking_id)
                 VALUES (?,?,?,'booked',?)
@@ -477,7 +683,9 @@ def admin_login():
         if user and check_password_hash(user['password_hash'], pwd):
             session['admin_id']   = user['id']
             session['admin_name'] = user['full_name'] or user['username']
-            xdb("UPDATE AdminUsers SET last_login=GETDATE() WHERE id=?", (user['id'],))
+            # Catat waktu login
+            xdb("UPDATE AdminUsers SET last_login=? WHERE id=?",
+                (datetime.now().isoformat(), user['id']))
             flash(f"Selamat datang, {session['admin_name']}!", 'success')
             return redirect(url_for('admin_dashboard'))
         flash('Username atau password salah.', 'error')
@@ -501,33 +709,35 @@ def admin_logout():
 def admin_dashboard():
     stats = qdb("""
         SELECT
-          (SELECT COUNT(*) FROM Cars)                                  AS total_cars,
-          (SELECT COUNT(*) FROM Cars WHERE is_available=1)            AS available_cars,
-          (SELECT COUNT(*) FROM Bookings)                             AS total_bookings,
-          (SELECT COUNT(*) FROM Bookings WHERE status='pending')      AS pending_bookings,
-          (SELECT COUNT(*) FROM Bookings WHERE status='confirmed')    AS confirmed_bookings,
-          (SELECT ISNULL(SUM(total_price),0) FROM Bookings
+          (SELECT COUNT(*) FROM Cars)                                 AS total_cars,
+          (SELECT COUNT(*) FROM Cars WHERE is_available=1)           AS available_cars,
+          (SELECT COUNT(*) FROM Bookings)                            AS total_bookings,
+          (SELECT COUNT(*) FROM Bookings WHERE status='pending')     AS pending_bookings,
+          (SELECT COUNT(*) FROM Bookings WHERE status='confirmed')   AS confirmed_bookings,
+          (SELECT COALESCE(SUM(total_price),0) FROM Bookings
            WHERE status IN ('confirmed','completed')
-             AND MONTH(created_at)=MONTH(GETDATE())
-             AND YEAR(created_at)=YEAR(GETDATE()))                    AS revenue_this_month
+             AND strftime('%Y-%m', created_at) = strftime('%Y-%m','now')
+          )                                                           AS revenue_this_month
     """, one=True)
 
     recent_bookings = qdb("""
-        SELECT TOP 8
+        SELECT
             b.id, b.customer_name, b.phone_number,
             b.start_date, b.end_date, b.total_price, b.status,
-            b.created_at, c.name AS car_name, c.brand
+            b.created_at,
+            CAST((julianday(b.end_date) - julianday(b.start_date)) AS INTEGER) AS total_days,
+            c.name AS car_name, c.brand
         FROM Bookings b JOIN Cars c ON b.car_id=c.id
         ORDER BY b.created_at DESC
+        LIMIT 8
     """)
 
-    # Statistik ulasan
     try:
         review_stats = qdb("""
             SELECT
-              COUNT(*)                                    AS total_reviews,
-              ISNULL(CAST(AVG(CAST(rating AS FLOAT)) AS DECIMAL(3,1)), 0) AS avg_rating,
-              SUM(CASE WHEN is_approved=1 THEN 1 ELSE 0 END) AS approved_reviews
+              COUNT(*)                                                       AS total_reviews,
+              ROUND(COALESCE(AVG(CAST(rating AS REAL)), 0), 1)              AS avg_rating,
+              SUM(CASE WHEN is_approved=1 THEN 1 ELSE 0 END)               AS approved_reviews
             FROM Reviews
         """, one=True)
     except Exception:
@@ -559,28 +769,33 @@ def admin_cars():
 def admin_car_add():
     cats = qdb("SELECT * FROM Categories WHERE is_active=1 ORDER BY sort_order")
     if request.method == 'POST':
-        img_fn = None
+        img_fn   = None
         img_file = request.files.get('image_file')
         if img_file and img_file.filename:
             img_fn = save_upload(img_file, UPLOAD_CARS, ALLOWED_IMG)
             if not img_fn:
-                flash('Format foto tidak valid (PNG/JPG/WEBP).', 'error')
+                flash('Format foto tidak valid (PNG/JPG/WEBP/JFIF).', 'error')
                 return render_template('admin/car_form.html', car=None, categories=cats)
 
         xdb("""
-            INSERT INTO Cars (category_id, name, brand, price_per_day,
-                              transmission, capacity, image_filename,
-                              description, year, color, license_plate,
-                              is_available, sort_order)
+            INSERT INTO Cars
+                (category_id, name, brand, price_per_day,
+                 transmission, capacity, image_filename,
+                 description, year, color, license_plate,
+                 is_available, sort_order)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, (
-            request.form['category_id'], request.form['name'],
-            request.form['brand'],       float(request.form['price_per_day']),
-            request.form['transmission'],int(request.form['capacity']),
-            img_fn,                      request.form.get('description',''),
+            request.form['category_id'],
+            request.form['name'],
+            request.form['brand'],
+            float(request.form['price_per_day']),
+            request.form['transmission'],
+            int(request.form['capacity']),
+            img_fn,
+            request.form.get('description', ''),
             request.form.get('year') or None,
-            request.form.get('color',''),
-            request.form.get('license_plate',''),
+            request.form.get('color', ''),
+            request.form.get('license_plate', ''),
             1 if request.form.get('is_available') else 0,
             int(request.form.get('sort_order', 0))
         ))
@@ -598,15 +813,14 @@ def admin_car_edit(car_id):
     if not car: abort(404)
 
     if request.method == 'POST':
-        img_fn = car['image_filename']  # pertahankan foto lama by default
+        img_fn   = car['image_filename']  # pertahankan foto lama by default
         img_file = request.files.get('image_file')
         if img_file and img_file.filename:
             new_fn = save_upload(img_file, UPLOAD_CARS, ALLOWED_IMG)
             if new_fn:
-                # Hapus foto lama jika ada
+                # Hapus foto lama hanya jika bukan URL eksternal
                 if img_fn and not img_fn.startswith('http'):
-                    old_path = os.path.join(UPLOAD_CARS, img_fn)
-                    try: os.remove(old_path)
+                    try: os.remove(os.path.join(UPLOAD_CARS, img_fn))
                     except: pass
                 img_fn = new_fn
             else:
@@ -617,18 +831,23 @@ def admin_car_edit(car_id):
                 category_id=?, name=?, brand=?, price_per_day=?,
                 transmission=?, capacity=?, image_filename=?,
                 description=?, year=?, color=?, license_plate=?,
-                is_available=?, sort_order=?, updated_at=GETDATE()
+                is_available=?, sort_order=?, updated_at=?
             WHERE id=?
         """, (
-            request.form['category_id'], request.form['name'],
-            request.form['brand'],       float(request.form['price_per_day']),
-            request.form['transmission'],int(request.form['capacity']),
-            img_fn,                      request.form.get('description',''),
+            request.form['category_id'],
+            request.form['name'],
+            request.form['brand'],
+            float(request.form['price_per_day']),
+            request.form['transmission'],
+            int(request.form['capacity']),
+            img_fn,
+            request.form.get('description', ''),
             request.form.get('year') or None,
-            request.form.get('color',''),
-            request.form.get('license_plate',''),
+            request.form.get('color', ''),
+            request.form.get('license_plate', ''),
             1 if request.form.get('is_available') else 0,
             int(request.form.get('sort_order', 0)),
+            datetime.now().isoformat(),
             car_id
         ))
         flash('Data mobil berhasil diperbarui!', 'success')
@@ -642,7 +861,6 @@ def admin_car_edit(car_id):
 def admin_car_delete(car_id):
     car = qdb("SELECT * FROM Cars WHERE id=?", (car_id,), one=True)
     if car:
-        # Hapus foto lokal
         if car['image_filename'] and not car['image_filename'].startswith('http'):
             try: os.remove(os.path.join(UPLOAD_CARS, car['image_filename']))
             except: pass
@@ -655,12 +873,13 @@ def admin_car_delete(car_id):
 @app.route('/admin/cars/toggle/<int:car_id>', methods=['POST'])
 @admin_required
 def admin_car_toggle(car_id):
-    """Toggle is_available AJAX endpoint."""
+    """Toggle is_available — AJAX endpoint."""
     car = qdb("SELECT is_available FROM Cars WHERE id=?", (car_id,), one=True)
     if not car:
         return jsonify({'ok': False}), 404
     new_val = 0 if car['is_available'] else 1
-    xdb("UPDATE Cars SET is_available=?, updated_at=GETDATE() WHERE id=?", (new_val, car_id))
+    xdb("UPDATE Cars SET is_available=?, updated_at=? WHERE id=?",
+        (new_val, datetime.now().isoformat(), car_id))
     return jsonify({'ok': True, 'is_available': new_val})
 
 
@@ -685,8 +904,8 @@ def admin_availability(car_id):
 @app.route('/admin/availability/<int:car_id>/add', methods=['POST'])
 @admin_required
 def admin_availability_add(car_id):
-    bs = request.form.get('block_start')
-    be = request.form.get('block_end')
+    bs     = request.form.get('block_start')
+    be     = request.form.get('block_end')
     reason = request.form.get('reason', 'maintenance')
     if bs and be:
         xdb("""
@@ -789,7 +1008,9 @@ def admin_discount_delete(disc_id):
 def admin_bookings():
     status_filter = request.args.get('status', '')
     sql = """
-        SELECT b.*, c.name AS car_name, c.brand,
+        SELECT b.*,
+               CAST((julianday(b.end_date) - julianday(b.start_date)) AS INTEGER) AS total_days,
+               c.name AS car_name, c.brand,
                d.name AS discount_name
         FROM Bookings b
         JOIN Cars c ON b.car_id=c.id
@@ -807,14 +1028,14 @@ def admin_bookings():
 @app.route('/admin/bookings/update-status/<int:bid>', methods=['POST'])
 @admin_required
 def admin_booking_status(bid):
-    new_status = request.form.get('status')
+    new_status  = request.form.get('status')
     admin_notes = request.form.get('admin_notes', '')
     valid_statuses = ('pending', 'confirmed', 'completed', 'cancelled')
     if new_status in valid_statuses:
         xdb("""
-            UPDATE Bookings SET status=?, admin_notes=?, updated_at=GETDATE()
+            UPDATE Bookings SET status=?, admin_notes=?, updated_at=?
             WHERE id=?
-        """, (new_status, admin_notes, bid))
+        """, (new_status, admin_notes, datetime.now().isoformat(), bid))
 
         # Jika dibatalkan, hapus blokir availability
         if new_status == 'cancelled':
@@ -876,22 +1097,18 @@ def admin_reviews():
     """Daftar semua ulasan dari publik."""
     status_filter = request.args.get('status', '')
     if status_filter == 'approved':
-        reviews = qdb("""
-            SELECT * FROM Reviews WHERE is_approved=1 ORDER BY created_at DESC
-        """)
+        reviews = qdb("SELECT * FROM Reviews WHERE is_approved=1 ORDER BY created_at DESC")
     elif status_filter == 'pending':
-        reviews = qdb("""
-            SELECT * FROM Reviews WHERE is_approved=0 ORDER BY created_at DESC
-        """)
+        reviews = qdb("SELECT * FROM Reviews WHERE is_approved=0 ORDER BY created_at DESC")
     else:
         reviews = qdb("SELECT * FROM Reviews ORDER BY created_at DESC")
 
     try:
         rev_stats = qdb("""
             SELECT
-              COUNT(*) AS total,
-              ISNULL(CAST(AVG(CAST(rating AS FLOAT)) AS DECIMAL(3,1)), 0) AS avg_rating,
-              SUM(CASE WHEN is_approved=1 THEN 1 ELSE 0 END) AS approved
+              COUNT(*)                                                    AS total,
+              ROUND(COALESCE(AVG(CAST(rating AS REAL)), 0), 1)           AS avg_rating,
+              SUM(CASE WHEN is_approved=1 THEN 1 ELSE 0 END)            AS approved
             FROM Reviews
         """, one=True)
     except Exception:
@@ -931,10 +1148,12 @@ def admin_review_delete(rev_id):
 def not_found(e):
     return render_template('public/404.html'), 404
 
+
 @app.errorhandler(413)
 def too_large(e):
     flash(f'File terlalu besar. Maksimum {MAX_UPLOAD_MB} MB.', 'error')
     return redirect(request.referrer or url_for('index'))
+
 
 # ─────────────────────────────────────────────────────
 if __name__ == '__main__':
